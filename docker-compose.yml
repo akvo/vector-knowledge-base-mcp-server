@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:12-alpine
+    environment:
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - ./db/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+      - pg-data:/var/lib/postgresql/data
+      - ./db/script:/script:ro
+    ports:
+      - 5432:5432
+    networks:
+      - app_network
+
+  main:
+    build:
+      context: ./main
+    depends_on:
+      - db
+      - chromadb
+      - minio
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=prod
+    ports:
+      - 8000:8000
+    restart: unless-stopped
+    networks:
+      - app_network
+
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - 8001:8000
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - app_network
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - 9000:9000 # API port
+      - 9001:9001 # Console port
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio_data:/data
+    command: server --console-address ":9001" /data
+    networks:
+      - app_network
+
+volumes:
+  pg-data:
+  chroma_data:
+  minio_data:
+
+networks:
+  app_network:
+    driver: bridge

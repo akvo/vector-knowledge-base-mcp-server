@@ -25,10 +25,11 @@ services:
       - APP_ENV=prod
     ports:
       - 8000:8000
+    volumes:
+      - ./main:/app:delegated
     restart: unless-stopped
     networks:
       - app_network
-
 
   chromadb:
     image: chromadb/chroma:latest

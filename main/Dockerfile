@@ -9,6 +9,9 @@ COPY ./app ./app
 COPY /entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+COPY /test.sh /test.sh
+RUN chmod +x /test.sh
+
 EXPOSE 8000
 
 ENTRYPOINT ["/entrypoint.sh"]

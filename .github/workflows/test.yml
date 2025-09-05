@@ -27,7 +27,7 @@ jobs:
           docker compose ps
 
       - name: Run tests in main container
-        run: docker compose exec -T main bash /app/test.sh
+        run: docker compose exec -T main bash /test.sh
 
       - name: Show logs if failure
         if: failure()

@@ -297,11 +297,6 @@ credentials.json
 vector_db/
 embeddings/
 
-# Model files (if storing ML models)
-*.model
-*.pkl
-*.joblib
-models/
 
 # Cache directories
 .cache/

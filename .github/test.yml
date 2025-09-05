@@ -1,0 +1,36 @@
+name: Test Service
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Start services
+        run: docker compose -f docker-compose.yml up -d --build
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for services..."
+          sleep 30
+          docker compose ps
+
+      - name: Run tests in main container
+        run: |
+          docker compose exec -T main bash ./test.sh
+
+      - name: Show logs if failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

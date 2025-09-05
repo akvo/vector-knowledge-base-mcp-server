@@ -9,3 +9,6 @@ httpx-sse==0.4.1
 pytest-asyncio==1.1.0
 
 asgi-lifespan==2.1.0
+
+coverage==7.10.6
+pytest-cov==6.2.1

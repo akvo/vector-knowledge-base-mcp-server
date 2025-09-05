@@ -7,5 +7,8 @@ from app.mcp.mcp_main import mcp
 async def test_sample_resource():
     async with Client(mcp) as client:
         resources = await client.list_resources()
-        uris = [str(r.uri) for r in resources]
-        assert "resource:/list/sample" in uris
+        target = next(
+            (r for r in resources if str(r.uri) == "resource:/list/sample"),
+            None,
+        )
+        assert target is not None

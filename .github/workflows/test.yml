@@ -29,6 +29,7 @@ jobs:
       - name: Run tests in main container
         run: |
           docker compose exec -T main bash ./test.sh
+        working-directory: main
 
       - name: Show logs if failure
         if: failure()

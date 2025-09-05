@@ -118,23 +118,25 @@ A high-performance FastAPI/FastMCP-based Model Context Protocol (MCP) server tha
 vector-knowledge-base-mcp-server/
 ├── main/                          # FastAPI application
 │   ├── app/
-│   │   ├── api/                   # API routes
-│   │   ├── core/                  # Core configuration
-│   │   ├── models/                # Data models
-│   │   ├── services/              # Business logic
-│   │   └── utils/                 # Utility functions
+│   │   ├── api/                   # API routes (endpoint FastAPI biasa)
+│   │   ├── core/                  # Core configuration (settings, logging, security)
+│   │   ├── mcp/                   # MCP related files (FastMCP server, tools)
+│   │   ├── models/                # Pydantic models / ORM models
+│   │   ├── services/              # Business logic / service layer
+│   │   ├── utils/                 # Helpers / utilities
+│   ├── tests/                     # Unit / integration tests
 │   ├── Dockerfile
 │   └── requirements.txt
-│   ├── tests/                     # Test files
 ├── db/
-│   ├── docker-entrypoint-initdb.d/ # Database initialization
-│   └── script/                    # Database scripts
+│   ├── docker-entrypoint-initdb.d/ # Init SQL scripts
+│   └── script/                    # Migration / seed
 ├── pgadmin4/
-│   └── servers.json               # PgAdmin server config
-├── docker-compose.yml             # Production compose
-├── docker-compose.override.yml    # Development overrides
-├── .env.example                   # Environment template
+│   └── servers.json               # GUI config
+├── docker-compose.yml             # Compose untuk prod
+├── docker-compose.override.yml    # Override untuk dev
+├── .env.example                   # Env vars
 └── README.md
+
 ```
 
 ## 🚨 Troubleshooting

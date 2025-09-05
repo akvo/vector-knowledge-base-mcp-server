@@ -1,5 +1,7 @@
 # Vector Knowledge Base MCP Server
 
+[![Repo Size](https://img.shields.io/github/repo-size/akvo/vector-knowledge-base-mcp-server)](https://img.shields.io/github/repo-size/akvo/vector-knowledge-base-mcp-server) [![Languages](https://img.shields.io/github/languages/count/akvo/vector-knowledge-base-mcp-server)](https://img.shields.io/github/languages/count/akvo/vector-knowledge-base-mcp-server) [![Issues](https://img.shields.io/github/issues/akvo/vector-knowledge-base-mcp-server)](https://img.shields.io/github/issues/akvo/vector-knowledge-base-mcp-server) [![Last Commit](https://img.shields.io/github/last-commit/akvo/vector-knowledge-base-mcp-server/main)](https://img.shields.io/github/last-commit/akvo/vector-knowledge-base-mcp-server/main)
+
 A high-performance FastAPI/FastMCP-based Model Context Protocol (MCP) server that provides vector-based knowledge management with document storage, similarity search, and intelligent retrieval capabilities.
 
 ---

@@ -99,6 +99,11 @@ A high-performance FastAPI/FastMCP-based Model Context Protocol (MCP) server tha
    docker compose ps
    ```
 
+5. **Running pytest**
+   ```bash
+   ./dev.sh exec main ./test.sh
+   ```
+
 ### Production Setup
 
 1. **Build and start production services**

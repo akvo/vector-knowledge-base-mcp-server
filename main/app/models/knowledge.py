@@ -43,6 +43,9 @@ class KnowledgeBase(Base, TimestampMixin):
         back_populates="knowledge_base",
         cascade="all, delete-orphan",
     )
+    processing_tasks = relationship(
+        "ProcessingTask", back_populates="knowledge_base"
+    )
 
 
 class Document(Base, TimestampMixin):
@@ -68,6 +71,9 @@ class Document(Base, TimestampMixin):
         "DocumentChunk",
         back_populates="document",
         cascade="all, delete-orphan",
+    )
+    processing_tasks = relationship(
+        "ProcessingTask", back_populates="document"
     )
 
     __table_args__ = (
@@ -121,3 +127,30 @@ class DocumentChunk(Base, TimestampMixin):
     document = relationship("Document", back_populates="chunks")
 
     __table_args__ = (sa.Index("idx_kb_file_name", "kb_id", "file_name"),)
+
+
+class ProcessingTask(Base):
+    __tablename__ = "processing_tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    knowledge_base_id = Column(Integer, ForeignKey("knowledge_bases.id"))
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=True)
+    document_upload_id = Column(
+        Integer, ForeignKey("document_uploads.id"), nullable=True
+    )
+    status = Column(
+        String(50), default="pending"
+    )  # pending, processing, completed, failed
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    knowledge_base = relationship(
+        "KnowledgeBase", back_populates="processing_tasks"
+    )
+    document = relationship("Document", back_populates="processing_tasks")
+    document_upload = relationship(
+        "DocumentUpload", backref="processing_tasks"
+    )

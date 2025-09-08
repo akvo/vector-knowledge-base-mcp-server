@@ -10,7 +10,13 @@ from alembic import context
 from psycopg2 import DatabaseError
 
 from app.models.base import Base
-from app.models.knowledge import KnowledgeBase  # noqa
+from app.models.knowledge import (  # noqa
+    KnowledgeBase,
+    Document,
+    DocumentUpload,
+    DocumentChunk,
+    ProcessingTask,
+)
 from app.core.config import settings
 
 

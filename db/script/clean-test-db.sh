@@ -3,11 +3,11 @@
 
 set -euo pipefail
 
-psql --user idc --no-align --list | \
+psql --user akvo --no-align --list | \
     awk -F'|' '/^test/ {print $1}' | \
     while read -r dbname
     do
-	psql --user idc --dbname idh_idc -c "DROP DATABASE ${dbname}"
+	psql --user akvo --dbname kb_mcp -c "DROP DATABASE ${dbname}"
     done
 
 echo "Done"

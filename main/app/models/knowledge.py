@@ -33,6 +33,11 @@ class KnowledgeBase(Base, TimestampMixin):
         back_populates="knowledge_base",
         cascade="all, delete-orphan",
     )
+    document_uploads = relationship(
+        "DocumentUpload",
+        back_populates="knowledge_base",
+        cascade="all, delete-orphan",
+    )
 
 
 class Document(Base, TimestampMixin):
@@ -60,4 +65,30 @@ class Document(Base, TimestampMixin):
         sa.UniqueConstraint(
             "knowledge_base_id", "file_name", name="uq_kb_file_name"
         ),
+    )
+
+
+class DocumentUpload(Base):
+    __tablename__ = "document_uploads"
+
+    id = Column(Integer, primary_key=True, index=True)
+    knowledge_base_id = Column(
+        Integer,
+        ForeignKey("knowledge_bases.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    file_name = Column(String(255), nullable=False)
+    file_hash = Column(String(64), nullable=False)
+    file_size = Column(BigInteger, nullable=False)
+    content_type = Column(String(100), nullable=False)
+    temp_path = Column(String(255), nullable=False)
+    created_at = Column(
+        TIMESTAMP, nullable=False, server_default=text("now()")
+    )
+    status = Column(String(50), nullable=False, server_default="pending")
+    error_message = Column(Text)
+
+    # Relationships
+    knowledge_base = relationship(
+        "KnowledgeBase", back_populates="document_uploads"
     )

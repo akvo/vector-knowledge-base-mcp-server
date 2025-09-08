@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
 from app.core.config import settings
 
 
@@ -11,8 +10,13 @@ def get_db_url():
     return DB_URL
 
 
-engine = create_engine(get_db_url(), pool_size=1, max_overflow=20)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+def get_engine():
+    return create_engine(get_db_url(), pool_size=1, max_overflow=20)
+
+
+SessionLocal = sessionmaker(
+    autocommit=False, autoflush=False, bind=get_engine()
+)
 
 
 def get_session():

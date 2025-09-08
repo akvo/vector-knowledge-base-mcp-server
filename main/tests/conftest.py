@@ -1,32 +1,112 @@
 import os
 import sys
-import pytest
+import time
 import warnings
+import pytest
 import pytest_asyncio
 
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker, Session
 from alembic import command
 from alembic.config import Config
-from asgi_lifespan import LifespanManager
 from fastapi import FastAPI
 from httpx import AsyncClient, ASGITransport
+from asgi_lifespan import LifespanManager
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
+# -------------------------------
+# ENV setup for testing
+# -------------------------------
+os.environ["TESTING"] = "1"
 
-# Apply migrations at beginning and end of testing session
-@pytest.fixture(scope="session")
+from app.db.connection import get_db_url, get_session
+from app.models.base import Base
+
+
+# -------------------------------
+# Helper: ensure _test in DB URL
+# -------------------------------
+def check_test_db_url():
+    db_url = get_db_url()
+    if "_test" not in db_url:
+        raise RuntimeError(
+            f"⚠️ The database URL for tests must contain '_test'. Found: {db_url}"
+        )
+    print(f"✅ Using test database URL: {db_url}")
+
+
+# -------------------------------
+# Helper: wait for DB ready
+# -------------------------------
+def wait_for_db(max_retries: int = 10, delay: int = 2):
+    engine = create_engine(get_db_url())
+    for i in range(max_retries):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return
+        except Exception as e:
+            print(f"DB not ready, retry {i+1}/{max_retries}: {e}")
+            time.sleep(delay)
+    raise RuntimeError("Database not available after retries")
+
+
+# -------------------------------
+# Apply migrations once per session
+# -------------------------------
+@pytest.fixture(scope="session", autouse=True)
 def apply_migrations():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
-    os.environ["TESTING"] = "1"
-    config = Config("alembic.ini")
+
+    check_test_db_url()
+    wait_for_db()
+
+    config = Config(os.path.join(BASE_DIR, "alembic.ini"))
     command.upgrade(config, "head")
 
 
+# -------------------------------
+# Session fixture: drop & recreate tables before each test
+# -------------------------------
 @pytest.fixture
-def app() -> FastAPI:
+def session() -> Session:
+    check_test_db_url()
+    engine = create_engine(get_db_url())
+
+    # drop & recreate schema
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+
+    TestingSessionLocal = sessionmaker(bind=engine)
+    session = TestingSessionLocal()
+    yield session
+    session.close()
+
+
+# -------------------------------
+# FastAPI test client with dependency override
+# -------------------------------
+@pytest.fixture
+def app(apply_migrations: None) -> FastAPI:
     from app.main import app
 
+    check_test_db_url()
+    engine = create_engine(get_db_url())
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+
+    TestingSessionLocal = sessionmaker(bind=engine)
+
+    def override_get_db():
+        try:
+            db = TestingSessionLocal()
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_session] = override_get_db
     return app
 
 

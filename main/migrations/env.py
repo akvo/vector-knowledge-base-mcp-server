@@ -9,7 +9,8 @@ from sqlalchemy import pool, create_engine, text
 from alembic import context
 from psycopg2 import DatabaseError
 
-from app.db.connection import Base
+from app.models.base import Base
+from app.models.knowledge import KnowledgeBase  # noqa
 from app.core.config import settings
 
 
@@ -45,9 +46,16 @@ def run_migrations_offline() -> None:
     if settings.testing:
         raise DatabaseError("Test migrations offline is not permitted.")
 
+    url = settings.database_url
+
     context.configure(
-        url=settings.database_url,
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        compare_type=True,
+        dialect_name="postgresql",
     )
+
     with context.begin_transaction():
         context.run_migrations()
 
@@ -61,16 +69,15 @@ def run_migrations_online() -> None:
         if settings.testing
         else settings.database_url
     )
-    # handle testing config for migrations
+
     if settings.testing:
-        # connect to primary db
         default_engine = create_engine(
             settings.database_url, isolation_level="AUTOCOMMIT"
         )
-        # drop testing db if it exists and create a fresh one
         with default_engine.connect() as default_conn:
             default_conn.execute(text("DROP DATABASE IF EXISTS kb_mcp_test"))
             default_conn.execute(text("CREATE DATABASE kb_mcp_test"))
+
     connectable = config.attributes.get("connection", None)
     config.set_main_option("sqlalchemy.url", DB_URL)
 
@@ -80,8 +87,15 @@ def run_migrations_online() -> None:
             prefix="sqlalchemy.",
             poolclass=pool.NullPool,
         )
+
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=None)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=True,
+            dialect_name="postgresql",
+        )
         with context.begin_transaction():
             context.run_migrations()
 

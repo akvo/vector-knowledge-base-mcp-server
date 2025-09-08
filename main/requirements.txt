@@ -12,3 +12,6 @@ asgi-lifespan==2.1.0
 
 coverage==7.10.6
 pytest-cov==6.2.1
+alembic==1.16.5
+psycopg2-binary==2.9.10
+SQLAlchemy==2.0.43

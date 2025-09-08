@@ -1,4 +1,4 @@
-CREATE USER kb_mcp_server WITH CREATEDB PASSWORD 'password';
+CREATE USER akvo WITH CREATEDB PASSWORD 'password';
 
 CREATE DATABASE kb_mcp
 WITH OWNER = kb_mcp_server

@@ -4,17 +4,25 @@ set -euo pipefail
 APP_ENV=${APP_ENV:-prod}
 HOST=0.0.0.0
 PORT=8000
+DATABASE_URL=${DATABASE_URL}
 
 echo "📦 Environment: $APP_ENV"
 echo "📡 FastAPI Host: $HOST"
 echo "🔌 FastAPI Port: $PORT"
 
-# Wait for Postgres
+
+if ! command -v psql >/dev/null 2>&1; then
+    echo "❌ psql not found! Please install postgresql-client in your Dockerfile"
+    exit 1
+fi
+
+# Tunggu Postgres siap menggunakan DATABASE_URL
 echo "⏳ Waiting for Postgres..."
-while ! nc -z db 5432; do
-    sleep 1
+until psql "$DATABASE_URL" -c '\q' 2>/dev/null; do
+    echo "   Postgres not ready yet..."
+    sleep 2
 done
-echo "✅ Postgres started"
+echo "✅ Postgres is ready!"
 
 # Run migrations
 echo "🗄️ Running migrations..."

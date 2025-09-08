@@ -17,6 +17,7 @@ from app.models.knowledge import (  # noqa
     DocumentChunk,
     ProcessingTask,
 )
+from app.models.api_key import APIKey  # noqa
 from app.core.config import settings
 
 

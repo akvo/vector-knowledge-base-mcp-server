@@ -5,6 +5,7 @@ from .knowledge import (
     DocumentChunk,
     ProcessingTask,
 )
+from .api_key import APIKey
 
 __all__ = [
     "KnowledgeBase",
@@ -12,4 +13,5 @@ __all__ = [
     "DocumentUpload",
     "DocumentChunk",
     "ProcessingTask",
+    "APIKey",
 ]

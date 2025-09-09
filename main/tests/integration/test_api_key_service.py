@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime
 
+from app.schemas.api_key_schema import APIKeyUpdate
 from app.services.api_key_service import APIKeyService
 
 
@@ -32,13 +33,13 @@ class TestAPIKeyService:
     def test_update_api_key(self, session):
         api_key = APIKeyService.create_api_key(session, "OldName")
         updated = APIKeyService.update_api_key(
-            session, api_key, {"name": "NewName"}
+            session, api_key, APIKeyUpdate(name="NewName")
         )
         assert updated.name == "NewName"
 
         # toggle is_active
         updated = APIKeyService.update_api_key(
-            session, api_key, {"is_active": False}
+            session, api_key, APIKeyUpdate(is_active=False)
         )
         assert updated.is_active is False
 

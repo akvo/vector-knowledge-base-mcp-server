@@ -15,7 +15,6 @@ class APIKeyUpdate(APIKeyUpdate):
 class APIKey(APIKeyBase):
     id: int
     key: str
-    user_id: int
     last_used_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime

@@ -2,6 +2,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.models.api_key import APIKey
+from app.schemas.api_key_schema import APIKeyUpdate
 
 
 class APIKeyService:
@@ -33,9 +34,9 @@ class APIKeyService:
 
     @staticmethod
     def update_api_key(
-        db: Session, api_key: APIKey, update_data: dict
+        db: Session, api_key: APIKey, update_data: APIKeyUpdate
     ) -> APIKey:
-        for field, value in update_data.items():
+        for field, value in update_data.model_dump(exclude_unset=True).items():
             setattr(api_key, field, value)
         db.add(api_key)
         db.commit()

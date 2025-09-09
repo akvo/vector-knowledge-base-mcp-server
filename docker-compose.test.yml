@@ -5,7 +5,8 @@ services:
     depends_on:
       - db
       - chroma_test
-      - minio_test
+      - minio_test:
+          condition: service_healthy
     env_file:
       - .env.test
     environment:
@@ -53,6 +54,12 @@ services:
     command: server --console-address ":9101" /data
     networks:
       - test_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live || exit 1"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
 
 volumes:
   pg-test-data:

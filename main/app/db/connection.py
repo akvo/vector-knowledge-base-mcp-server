@@ -4,14 +4,10 @@ from app.core.config import settings
 
 
 def get_db_url():
-    TESTING = settings.testing
-    DATABASE_URL = settings.database_url
-    DB_URL = (
-        f"{DATABASE_URL}_test"
-        if TESTING and "_test" not in DATABASE_URL
-        else DATABASE_URL
-    )
-    return DB_URL
+    url = settings.database_url
+    if settings.testing and not url.endswith("_test"):
+        url += "_test"
+    return url
 
 
 def get_engine():

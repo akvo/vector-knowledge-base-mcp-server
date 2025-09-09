@@ -68,19 +68,24 @@ def apply_migrations():
 
 
 # -------------------------------
-# Session fixture: drop & recreate tables before each test
+# Session fixture: truncate tables before each test
 # -------------------------------
 @pytest.fixture
 def session() -> Session:
     check_test_db_url()
     engine = create_engine(get_db_url())
-
-    # drop & recreate schema
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-
     TestingSessionLocal = sessionmaker(bind=engine)
     session = TestingSessionLocal()
+
+    # Truncate
+    with engine.connect() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            conn.execute(
+                text(
+                    f'TRUNCATE TABLE "{table.name}" RESTART IDENTITY CASCADE;'
+                )
+            )
+
     yield session
     session.close()
 

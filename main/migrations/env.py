@@ -5,7 +5,7 @@ import logging
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
-from sqlalchemy import pool, create_engine, text
+from sqlalchemy import pool
 from alembic import context
 from psycopg2 import DatabaseError
 
@@ -76,14 +76,6 @@ def run_migrations_online() -> None:
         if settings.testing
         else settings.database_url
     )
-
-    if settings.testing:
-        default_engine = create_engine(
-            settings.database_url, isolation_level="AUTOCOMMIT"
-        )
-        with default_engine.connect() as default_conn:
-            default_conn.execute(text("DROP DATABASE IF EXISTS kb_mcp_test"))
-            default_conn.execute(text("CREATE DATABASE kb_mcp_test"))
 
     connectable = config.attributes.get("connection", None)
     config.set_main_option("sqlalchemy.url", DB_URL)

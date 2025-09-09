@@ -26,4 +26,4 @@ class APIKey(Base, TimestampMixin):
         return secrets.token_hex(length)
 
     def mark_used(self):
-        self.last_used = datetime.utcnow()
+        self.last_used_at = datetime.utcnow()

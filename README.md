@@ -128,7 +128,7 @@ A high-performance FastAPI/FastMCP-based Model Context Protocol (MCP) server tha
 vector-knowledge-base-mcp-server/
 ├── main/                          # FastAPI application
 │   ├── app/
-│   │   ├── api/                   # API routes (endpoint FastAPI biasa)
+│   │   ├── api/                   # API routes (endpoint FastAPI)
 │   │   ├── core/                  # Core configuration (settings, logging, security)
 │   │   ├── mcp/                   # MCP related files (FastMCP server, tools)
 │   │   ├── models/                # Pydantic models / ORM models
@@ -142,8 +142,8 @@ vector-knowledge-base-mcp-server/
 │   └── script/                    # Migration / seed
 ├── pgadmin4/
 │   └── servers.json               # GUI config
-├── docker-compose.yml             # Compose untuk prod
-├── docker-compose.override.yml    # Override untuk dev
+├── docker-compose.yml             # Compose prod
+├── docker-compose.override.yml    # Override dev
 ├── .env.example                   # Env vars
 └── README.md
 

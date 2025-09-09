@@ -18,6 +18,7 @@ A high-performance FastAPI/FastMCP-based Model Context Protocol (MCP) server tha
     - [Development Setup](#development-setup)
     - [Production Setup](#production-setup)
     - [Service Ports](#service-ports)
+  - [🔑 Authentication](#-authentication)
   - [📁 Project Structure](#-project-structure)
   - [🚨 Troubleshooting](#-troubleshooting)
     - [Health Checks](#health-checks)
@@ -121,6 +122,24 @@ A high-performance FastAPI/FastMCP-based Model Context Protocol (MCP) server tha
 | MinIO API | 9100 | 9000 | Object storage API |
 | MinIO Console | 9101 | 9001 | MinIO web interface |
 | PgAdmin | 5550 | - | Database admin (dev only) |
+
+## 🔑 Authentication
+
+All protected routes require an API Key.
+
+Requests must include the API key in the `Authorization` header:
+
+```http
+Authorization: API-Key <your_api_key>
+```
+
+Example:
+```bash
+curl -X GET http://localhost:8100/api/v1/knowledge-base \
+  -H "Authorization: API-Key sk_test_xxxxxxx"
+```
+👉 See SECURITY.md
+
 
 ## 📁 Project Structure
 

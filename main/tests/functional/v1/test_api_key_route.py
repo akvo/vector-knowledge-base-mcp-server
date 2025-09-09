@@ -10,6 +10,7 @@ class TestAPIKeyRoute:
     async def test_create_api_key(
         self, app: FastAPI, session: Session, client: AsyncClient
     ):
+        """Create API key route should create and return the key"""
         response = await client.post(
             app.url_path_for("v1_create_api_key"), json={"name": "Test Key"}
         )
@@ -20,6 +21,7 @@ class TestAPIKeyRoute:
     async def test_list_api_keys(
         self, app: FastAPI, session: Session, client: AsyncClient
     ):
+        """List API keys route should return multiple keys"""
         await client.post(
             app.url_path_for("v1_create_api_key"), json={"name": "List Key"}
         )
@@ -31,6 +33,7 @@ class TestAPIKeyRoute:
     async def test_update_api_key(
         self, app: FastAPI, session: Session, client: AsyncClient
     ):
+        """Update API key route should modify key attributes"""
         # Return 404
         response = await client.put(
             app.url_path_for("v1_update_api_key", id=100),
@@ -56,6 +59,7 @@ class TestAPIKeyRoute:
     async def test_delete_api_key(
         self, app: FastAPI, session: Session, client: AsyncClient
     ):
+        """Delete API key route should remove the key"""
         # Return 404
         response = await client.delete(
             app.url_path_for("v1_delete_api_key", id=100)

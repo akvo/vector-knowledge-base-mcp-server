@@ -1,4 +1,5 @@
 import logging
+
 from minio import Minio
 from app.core.config import settings
 

@@ -26,7 +26,7 @@ jobs:
       - name: Wait for MinIO
         run: |
           echo "Waiting for MinIO..."
-          until docker compose exec -T minio_test mc alias list >/dev/null 2>&1; do
+          until curl -s -f http://localhost:9100/minio/health/live >/dev/null 2>&1; do
             sleep 2
           done
           echo "MinIO is ready."

@@ -124,3 +124,6 @@ def update_knowledge_base(
     db.refresh(kb)
     logger.info(f"Knowledge base updated: {kb.name}")
     return kb
+
+
+# TODO:: SETUP MINIO CHROMA and route related to documents and chunks

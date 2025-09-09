@@ -5,6 +5,8 @@ def test_default_settings(monkeypatch):
     """Default settings should be non-testing with a valid DB URL."""
     monkeypatch.delenv("TESTING", raising=False)
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/db")
+    monkeypatch.setenv("MINIO_ENDPOINT", "localhost:9000")
+    monkeypatch.setenv("CHROMA_DB_HOST", "localhost")
 
     import app.core.config as config
 

@@ -25,9 +25,8 @@ def init_minio():
     client = get_minio_client()
     logger.info(f"Checking if bucket {settings.minio_bucket_name} exists.")
     if not client.bucket_exists(settings.minio_bucket_name):
-        logger.info(
-            f"Bucket {settings.minio_bucket_name} does not exist. Creating bucket."
-        )
+        logger.info(f"Bucket {settings.minio_bucket_name} does not exist.")
+        logger.info("Creating bucket.")
         client.make_bucket(settings.minio_bucket_name)
     else:
         logger.info(f"Bucket {settings.minio_bucket_name} already exists.")

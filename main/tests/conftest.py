@@ -11,7 +11,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from httpx import AsyncClient, ASGITransport
-from asgi_lifespan import LifespanManager
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -23,6 +23,7 @@ os.environ["TESTING"] = "1"
 
 from app.db.connection import get_db_url, get_session
 from app.models.base import Base
+from app.services.api_key_service import APIKeyService
 
 
 # -------------------------------
@@ -122,3 +123,10 @@ async def client(app: FastAPI) -> AsyncClient:
         transport=transport, base_url="http://testserver"
     ) as c:
         yield c
+
+
+@pytest.fixture(scope="function")
+def api_key_value(session: Session) -> str:
+    """Create a global API key for tests"""
+    api_key = APIKeyService.create_api_key(session, "Global Test Key")
+    return api_key.key

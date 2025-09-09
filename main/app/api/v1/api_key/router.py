@@ -11,7 +11,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/", response_model=List[schema.APIKey], name="v1_list_api_keys")
+@router.get("", response_model=List[schema.APIKey], name="v1_list_api_keys")
 def read_api_keys(
     db: Session = Depends(get_session),
     skip: int = 0,
@@ -24,7 +24,7 @@ def read_api_keys(
     return api_keys
 
 
-@router.post("/", response_model=schema.APIKey, name="v1_create_api_key")
+@router.post("", response_model=schema.APIKey, name="v1_create_api_key")
 def create_api_key(
     *,
     db: Session = Depends(get_session),

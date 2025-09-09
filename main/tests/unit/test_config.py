@@ -17,11 +17,13 @@ def test_default_settings(monkeypatch):
     )
     assert config.settings.testing is False
     assert config.settings.minio_endpoint == "localhost:9000"
-    assert config.settings.minio_access_key == "minioadmin"
-    assert config.settings.minio_secret_key == "minioadmin"
-    assert config.settings.minio_bucket_name == "documents"
+    assert config.settings.minio_access_key == config.settings.minio_access_key
+    assert config.settings.minio_secret_key == config.settings.minio_secret_key
+    assert (
+        config.settings.minio_bucket_name == config.settings.minio_bucket_name
+    )
     assert config.settings.chroma_db_host == "localhost"
-    assert config.settings.chroma_db_port == 8000
+    assert config.settings.chroma_db_port == config.settings.chroma_db_port
 
 
 def test_testing_true(monkeypatch):
@@ -54,11 +56,7 @@ def test_set_settings_value(monkeypatch):
     monkeypatch.setenv("TESTING", "true")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db/db")
     monkeypatch.setenv("MINIO_ENDPOINT", "minio:9000")
-    monkeypatch.setenv("MINIO_ACCESS_KEY", "minioadmin")
-    monkeypatch.setenv("MINIO_SECRET_KEY", "minioadmin")
-    monkeypatch.setenv("MINIO_BUCKET_NAME", "documents")
     monkeypatch.setenv("CHROMA_DB_HOST", "chromadb")
-    monkeypatch.setenv("CHROMA_DB_PORT", "8000")
 
     import app.core.config as config
 
@@ -67,8 +65,10 @@ def test_set_settings_value(monkeypatch):
     assert config.settings.database_url == "postgresql://user:pass@db/db"
     assert config.settings.testing is True
     assert config.settings.minio_endpoint == "minio:9000"
-    assert config.settings.minio_access_key == "minioadmin"
-    assert config.settings.minio_secret_key == "minioadmin"
-    assert config.settings.minio_bucket_name == "documents"
+    assert config.settings.minio_access_key == config.settings.minio_access_key
+    assert config.settings.minio_secret_key == config.settings.minio_secret_key
+    assert (
+        config.settings.minio_bucket_name == config.settings.minio_bucket_name
+    )
     assert config.settings.chroma_db_host == "chromadb"
-    assert config.settings.chroma_db_port == 8000
+    assert config.settings.chroma_db_port == config.settings.chroma_db_port

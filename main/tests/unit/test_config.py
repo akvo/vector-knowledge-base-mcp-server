@@ -17,7 +17,7 @@ def test_default_settings(monkeypatch):
     assert config.settings.minio_endpoint == "localhost:9000"
     assert config.settings.minio_access_key == "minioadmin"
     assert config.settings.minio_secret_key == "minioadmin"
-    assert config.settings.minio_bucker_name == "documents"
+    assert config.settings.minio_bucket_name == "documents"
     assert config.settings.chroma_db_host == "localhost"
     assert config.settings.chroma_db_port == 8000
 
@@ -67,6 +67,6 @@ def test_set_settings_value(monkeypatch):
     assert config.settings.minio_endpoint == "minio:9000"
     assert config.settings.minio_access_key == "minioadmin"
     assert config.settings.minio_secret_key == "minioadmin"
-    assert config.settings.minio_bucker_name == "documents"
+    assert config.settings.minio_bucket_name == "documents"
     assert config.settings.chroma_db_host == "chromadb"
     assert config.settings.chroma_db_port == 8000

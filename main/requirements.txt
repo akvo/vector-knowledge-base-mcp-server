@@ -15,3 +15,5 @@ pytest-cov==6.2.1
 alembic==1.16.5
 psycopg2-binary==2.9.10
 SQLAlchemy==2.0.43
+minio==7.2.16
+pytest-mock==3.15.0

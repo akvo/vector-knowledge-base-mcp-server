@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     minio_endpoint: str = "localhost:9000"
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
-    minio_bucker_name: str = "documents"
+    minio_bucket_name: str = "documents"
 
     # Chroma DB settings
     chroma_db_host: str = "localhost"

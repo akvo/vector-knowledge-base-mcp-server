@@ -11,6 +11,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from httpx import AsyncClient, ASGITransport
+from unittest.mock import patch, MagicMock
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -21,9 +22,9 @@ sys.path.append(BASE_DIR)
 # -------------------------------
 os.environ["TESTING"] = "1"
 
-from app.db.connection import get_db_url, get_session
-from app.models.base import Base
-from app.services.api_key_service import APIKeyService
+from app.db.connection import get_db_url, get_session  # noqa
+from app.models.base import Base  # noqa
+from app.services.api_key_service import APIKeyService  # noqa
 
 
 # -------------------------------
@@ -31,10 +32,11 @@ from app.services.api_key_service import APIKeyService
 # -------------------------------
 def check_test_db_url():
     db_url = get_db_url()
+    err_msg = (
+        f"⚠️ The database URL for tests must contain '_test'. Found: {db_url}"
+    )
     if "_test" not in db_url:
-        raise RuntimeError(
-            f"⚠️ The database URL for tests must contain '_test'. Found: {db_url}"
-        )
+        raise RuntimeError(err_msg)
     print(f"✅ Using test database URL: {db_url}")
 
 
@@ -130,3 +132,39 @@ def api_key_value(session: Session) -> str:
     """Create a global API key for tests"""
     api_key = APIKeyService.create_api_key(session, "Global Test Key")
     return api_key.key
+
+
+@pytest.fixture
+def mock_chroma():
+    """
+    Fixture to mock chromadb.HttpClient and Chroma store.
+    """
+    with patch(
+        "app.services.chromadb_service.chromadb.HttpClient"
+    ) as mock_client, patch(
+        "app.services.chromadb_service.Chroma"
+    ) as mock_store:
+        mock_instance = mock_store.return_value
+        mock_collection = mock_instance._collection
+        yield {
+            "mock_client": mock_client,
+            "mock_store": mock_store,
+            "mock_instance": mock_instance,
+            "mock_collection": mock_collection,
+        }
+
+
+@pytest.fixture
+def mock_minio_client():
+    with patch(
+        "app.services.minio_service.get_minio_client"
+    ) as mock_get_client:
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        yield mock_client
+
+
+@pytest.fixture
+def mock_minio_class():
+    with patch("app.services.minio_service.Minio") as mock_minio_cls:
+        yield mock_minio_cls

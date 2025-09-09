@@ -1,7 +1,7 @@
 from typing import Optional
 from datetime import datetime
 
-from app.schemas.api_key import APIKeyBase, APIKeyUpdate
+from app.schemas.api_key_schema import APIKeyBase, APIKeyUpdate
 
 
 class APIKeyCreate(APIKeyBase):

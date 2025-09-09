@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 import logging
 
 from app.db.connection import get_session
-from app.services.api_key import APIKeyService
+from app.services.api_key_service import APIKeyService
 from . import schema
 
 router = APIRouter()

@@ -22,7 +22,7 @@ class APIKeyService:
     @staticmethod
     def create_api_key(db: Session, name: str) -> APIKey:
         api_key = APIKey(
-            key=f"sk-{APIKey.generate_api_key(32)}",
+            key=APIKey.generate_api_key(32),
             name=name,
             is_active=True,
         )

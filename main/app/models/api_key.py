@@ -23,7 +23,7 @@ class APIKey(Base, TimestampMixin):
 
     @staticmethod
     def generate_api_key(length: int = 32) -> str:
-        return secrets.token_hex(length)
+        return f"sk-{secrets.token_hex(length)}"
 
     def mark_used(self):
         self.last_used_at = datetime.utcnow()

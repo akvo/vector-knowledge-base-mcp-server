@@ -17,3 +17,7 @@ psycopg2-binary==2.9.10
 SQLAlchemy==2.0.43
 minio==7.2.16
 pytest-mock==3.15.0
+
+chromadb==1.0.20
+langchain-core==0.3.75
+langchain-chroma==0.2.5

@@ -34,7 +34,7 @@ jobs:
       - name: Wait for ChromaDB
         run: |
           echo "Waiting for ChromaDB..."
-          until curl -s http://localhost:8102/api/v2/heartbeat | grep ok >/dev/null; do
+          until curl -s http://localhost:8102/api/v2/heartbeat | grep "nanosecond heartbeat" >/dev/null 2>&1; do
             sleep 2
           done
           echo "ChromaDB is ready."

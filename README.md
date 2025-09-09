@@ -132,6 +132,7 @@ vector-knowledge-base-mcp-server/
 │   │   ├── core/                  # Core configuration (settings, logging, security)
 │   │   ├── mcp/                   # MCP related files (FastMCP server, tools)
 │   │   ├── models/                # Pydantic models / ORM models
+│   │   ├── schemas/               # API schemas (Pydantic / base)
 │   │   ├── services/              # Business logic / service layer
 │   │   ├── utils/                 # Helpers / utilities
 │   ├── tests/                     # Unit / integration tests

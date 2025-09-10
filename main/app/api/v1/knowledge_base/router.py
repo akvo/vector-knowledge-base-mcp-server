@@ -30,6 +30,7 @@ from .schema import (
     KnowledgeBaseResponse,
     KnowledgeBaseUpdate,
     PreviewRequest,
+    DocumentResponse,
 )
 from app.services.minio_service import get_minio_client
 from app.services.embedding_factory import EmbeddingsFactory
@@ -539,3 +540,34 @@ async def get_processing_tasks(
         }
         for task in tasks
     }
+
+
+@router.get(
+    "/{kb_id}/documents/{doc_id}",
+    response_model=DocumentResponse,
+    name="v1_get_document",
+)
+async def get_document(
+    *,
+    db: Session = Depends(get_session),
+    kb_id: int,
+    doc_id: int,
+    api_key: APIKey = Depends(get_api_key),
+) -> Any:
+    """
+    Get document details by ID.
+    """
+    document = (
+        db.query(Document)
+        .join(KnowledgeBase)
+        .filter(
+            Document.id == doc_id,
+            Document.knowledge_base_id == kb_id,
+        )
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return document

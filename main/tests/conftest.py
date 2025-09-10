@@ -168,3 +168,18 @@ def mock_minio_client():
 def mock_minio_class():
     with patch("app.services.minio_service.Minio") as mock_minio_cls:
         yield mock_minio_cls
+
+
+@pytest.fixture
+def mock_openai_embeddings():
+    """
+    Fixture to mock OpenAIEmbeddings class from langchain_openai.
+    Returns the MagicMock instance and the patcher so it can be asserted if
+    needed.
+    """
+    with patch(
+        "app.services.embedding_factory.OpenAIEmbeddings"
+    ) as mock_class:
+        mock_instance = MagicMock()
+        mock_class.return_value = mock_instance
+        yield mock_instance, mock_class

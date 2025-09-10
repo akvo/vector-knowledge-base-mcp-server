@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     chroma_db_host: str = "localhost"
     chroma_db_port: int = 8000
 
+    # OpenAI settings
+    openai_api_key: str = "your-openai-api-key-here"
+    openai_api_base: str = "https://api.openai.com/v1"
+    openai_model: str = "gpt-4"
+    openai_embeddings_model: str = "text-embedding-ada-002"
+
     @field_validator("database_url", mode="before")
     def escape_percent(cls, v: str) -> str:
         return v.replace("%", "%%") if v else v

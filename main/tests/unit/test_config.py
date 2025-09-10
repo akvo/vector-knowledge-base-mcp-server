@@ -24,6 +24,13 @@ def test_default_settings(monkeypatch):
     )
     assert config.settings.chroma_db_host == "localhost"
     assert config.settings.chroma_db_port == config.settings.chroma_db_port
+    assert config.settings.openai_api_key == config.settings.openai_api_key
+    assert config.settings.openai_api_base == config.settings.openai_api_base
+    assert config.settings.openai_model == config.settings.openai_model
+    assert (
+        config.settings.openai_embeddings_model
+        == config.settings.openai_embeddings_model
+    )
 
 
 def test_testing_true(monkeypatch):
@@ -57,6 +64,7 @@ def test_set_settings_value(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db/db")
     monkeypatch.setenv("MINIO_ENDPOINT", "minio:9000")
     monkeypatch.setenv("CHROMA_DB_HOST", "chromadb")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
 
     import app.core.config as config
 
@@ -72,3 +80,10 @@ def test_set_settings_value(monkeypatch):
     )
     assert config.settings.chroma_db_host == "chromadb"
     assert config.settings.chroma_db_port == config.settings.chroma_db_port
+    assert config.settings.openai_api_key == "test-openai-api-key"
+    assert config.settings.openai_api_base == config.settings.openai_api_base
+    assert config.settings.openai_model == config.settings.openai_model
+    assert (
+        config.settings.openai_embeddings_model
+        == config.settings.openai_embeddings_model
+    )

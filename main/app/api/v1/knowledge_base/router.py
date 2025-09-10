@@ -302,7 +302,7 @@ async def upload_kb_documents(
     return results
 
 
-@router.post("/{kb_id}/documents/preview")
+@router.post("/{kb_id}/documents/preview", name="v1_preview_kb_documents")
 async def preview_kb_documents(
     kb_id: int,
     preview_request: PreviewRequest,

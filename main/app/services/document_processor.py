@@ -498,7 +498,7 @@ async def process_document_background(
                 f"Task {task_id}: Cleaning up temporary file after error"
             )
             minio_client.remove_object(
-                bucket_name=settings.MINIO_BUCKET_NAME, object_name=temp_path
+                bucket_name=settings.minio_bucket_name, object_name=temp_path
             )
             logger.info(
                 f"Task {task_id}: Temporary file cleaned up after error"

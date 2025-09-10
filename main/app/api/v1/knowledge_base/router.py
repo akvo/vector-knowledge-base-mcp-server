@@ -2,6 +2,7 @@ import asyncio
 import logging
 import hashlib
 
+from datetime import datetime, timedelta
 from typing import List, Any, Dict
 from fastapi import (
     APIRouter,
@@ -441,6 +442,7 @@ async def process_kb_documents(
     return {"tasks": task_info}
 
 
+# Helper function to add tasks to the queue
 async def add_processing_tasks_to_queue(task_data, kb_id):
     """
     Helper function to add document processing tasks to the queue without
@@ -457,3 +459,37 @@ async def add_processing_tasks_to_queue(task_data, kb_id):
             )
         )
     logger.info(f"Added {len(task_data)} document processing tasks to queue")
+
+
+@router.post("/cleanup", name="v1_cleanup_temp_files")
+async def cleanup_temp_files(
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
+):
+    """
+    Clean up expired temporary files.
+    """
+    expired_time = datetime.utcnow() - timedelta(hours=24)
+    expired_uploads = (
+        db.query(DocumentUpload)
+        .filter(DocumentUpload.created_at < expired_time)
+        .all()
+    )
+
+    minio_client = get_minio_client()
+    for upload in expired_uploads:
+        try:
+            minio_client.remove_object(
+                bucket_name=settings.minio_bucket_name,
+                object_name=upload.temp_path,
+            )
+        except MinioException as e:
+            logger.error(
+                f"Failed to delete temp file {upload.temp_path}: {str(e)}"
+            )
+
+        db.delete(upload)
+
+    db.commit()
+
+    return {"message": f"Cleaned up {len(expired_uploads)} expired uploads"}

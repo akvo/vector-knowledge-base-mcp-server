@@ -10,8 +10,9 @@ from fastapi import (
     HTTPException,
     UploadFile,
     BackgroundTasks,
+    Query,
 )
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from minio.error import MinioException
 
 from app.core.config import settings
@@ -493,3 +494,48 @@ async def cleanup_temp_files(
     db.commit()
 
     return {"message": f"Cleaned up {len(expired_uploads)} expired uploads"}
+
+
+@router.get("/{kb_id}/documents/tasks", name="v1_get_processing_tasks")
+async def get_processing_tasks(
+    kb_id: int,
+    task_ids: str = Query(
+        ..., description="Comma-separated list of task IDs to check status for"
+    ),
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
+):
+    """
+    Get status of multiple processing tasks.
+    """
+    task_id_list = [int(id.strip()) for id in task_ids.split(",")]
+
+    kb = db.query(KnowledgeBase).filter(KnowledgeBase.id == kb_id).first()
+
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    tasks = (
+        db.query(ProcessingTask)
+        .options(selectinload(ProcessingTask.document_upload))
+        .filter(
+            ProcessingTask.id.in_(task_id_list),
+            ProcessingTask.knowledge_base_id == kb_id,
+        )
+        .all()
+    )
+
+    return {
+        task.id: {
+            "document_id": task.document_id,
+            "status": task.status,
+            "error_message": task.error_message,
+            "upload_id": task.document_upload_id,
+            "file_name": (
+                task.document_upload.file_name
+                if task.document_upload
+                else None
+            ),
+        }
+        for task in tasks
+    }

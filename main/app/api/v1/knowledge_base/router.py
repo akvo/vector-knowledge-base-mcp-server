@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import hashlib
 
@@ -7,6 +8,7 @@ from fastapi import (
     Depends,
     HTTPException,
     UploadFile,
+    BackgroundTasks,
 )
 from sqlalchemy.orm import Session
 from minio.error import MinioException
@@ -15,7 +17,12 @@ from app.core.config import settings
 from app.db.connection import get_session
 from app.core.security import get_api_key
 from app.models.api_key import APIKey
-from app.models.knowledge import KnowledgeBase, Document, DocumentUpload
+from app.models.knowledge import (
+    KnowledgeBase,
+    Document,
+    DocumentUpload,
+    ProcessingTask,
+)
 from .schema import (
     KnowledgeBaseCreate,
     KnowledgeBaseResponse,
@@ -25,7 +32,11 @@ from .schema import (
 from app.services.minio_service import get_minio_client
 from app.services.embedding_factory import EmbeddingsFactory
 from app.services.chromadb_service import ChromaVectorStore
-from app.services.document_processor import preview_document, PreviewResult
+from app.services.document_processor import (
+    preview_document,
+    PreviewResult,
+    process_document_background,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -352,3 +363,97 @@ async def preview_kb_documents(
         results[doc_id] = preview
 
     return results
+
+
+@router.post("/{kb_id}/documents/process", name="v1_process_kb_documents")
+async def process_kb_documents(
+    kb_id: int,
+    upload_results: List[dict],
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
+):
+    """
+    Process multiple documents asynchronously.
+    """
+    kb = db.query(KnowledgeBase).filter(KnowledgeBase.id == kb_id).first()
+
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    task_info = []
+    upload_ids = []
+
+    for result in upload_results:
+        if result.get("skip_processing"):
+            continue
+        upload_ids.append(result["upload_id"])
+
+    if not upload_ids:
+        return {"tasks": []}
+
+    uploads = (
+        db.query(DocumentUpload)
+        .filter(DocumentUpload.id.in_(upload_ids))
+        .all()
+    )
+    uploads_dict = {upload.id: upload for upload in uploads}
+
+    all_tasks = []
+    for upload_id in upload_ids:
+        upload = uploads_dict.get(upload_id)
+        if not upload:
+            continue
+
+        task = ProcessingTask(
+            document_upload_id=upload_id,
+            knowledge_base_id=kb_id,
+            status="pending",
+        )
+        all_tasks.append(task)
+
+    db.add_all(all_tasks)
+    db.commit()
+
+    for task in all_tasks:
+        db.refresh(task)
+
+    task_data = []
+    for i, upload_id in enumerate(upload_ids):
+        if i < len(all_tasks):
+            task = all_tasks[i]
+            upload = uploads_dict.get(upload_id)
+
+            task_info.append({"upload_id": upload_id, "task_id": task.id})
+
+            if upload:
+                task_data.append(
+                    {
+                        "task_id": task.id,
+                        "upload_id": upload_id,
+                        "temp_path": upload.temp_path,
+                        "file_name": upload.file_name,
+                    }
+                )
+
+    background_tasks.add_task(add_processing_tasks_to_queue, task_data, kb_id)
+
+    return {"tasks": task_info}
+
+
+async def add_processing_tasks_to_queue(task_data, kb_id):
+    """
+    Helper function to add document processing tasks to the queue without
+    blocking the main response.
+    """
+    for data in task_data:
+        asyncio.create_task(
+            process_document_background(
+                data["temp_path"],
+                data["file_name"],
+                kb_id,
+                data["task_id"],
+                None,
+            )
+        )
+    logger.info(f"Added {len(task_data)} document processing tasks to queue")

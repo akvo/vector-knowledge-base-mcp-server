@@ -12,6 +12,24 @@ class TestDeleteKnowledgeBase:
     def get_headers(self, api_key_value: str):
         return {"Authorization": f"API-Key {api_key_value}"}
 
+    async def test_delete_kb_requires_api_key(
+        self, app, session, client, patch_kb_route_services
+    ):
+        """No API key should return 401"""
+        kb = KnowledgeBase(name="Test KB", description="A test KB")
+        session.add(kb)
+        session.commit()
+        kb_id = kb.id
+
+        mock_minio, mock_vector, _ = patch_kb_route_services
+        mock_minio.list_objects.return_value = []
+
+        res = await client.delete(
+            app.url_path_for("v1_delete_knowledge_base", kb_id=kb_id),
+        )
+        assert res.status_code == 401
+        assert res.json()["detail"] == "API key required"
+
     async def test_delete_success(
         self,
         client,

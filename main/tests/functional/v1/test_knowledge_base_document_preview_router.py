@@ -13,6 +13,29 @@ class TestPreviewDocumentsRoute:
     def get_headers(self, api_key_value: str):
         return {"Authorization": f"API-Key {api_key_value}"}
 
+    async def test_preview_unauthorized(
+        self,
+        app: FastAPI,
+        session: Session,
+        client: AsyncClient,
+    ):
+        """Preview route should return 401 if no API key is provided"""
+        kb = KnowledgeBase(name="KB Unauthorized", description="desc")
+        session.add(kb)
+        session.commit()
+
+        res = await client.post(
+            app.url_path_for("v1_preview_kb_documents", kb_id=kb.id),
+            json={
+                "document_ids": [1],
+                "chunk_size": 50,
+                "chunk_overlap": 0,
+            },
+        )
+
+        assert res.status_code == 401
+        assert res.json()["detail"] == "API key required"
+
     @patch("app.api.v1.knowledge_base.router.preview_document")
     async def test_preview_with_document(
         self,

@@ -12,6 +12,26 @@ class TestUploadKBDocuments:
     def get_headers(self, api_key_value: str):
         return {"Authorization": f"API-Key {api_key_value}"}
 
+    async def test_upload_kb_requires_api_key(self, app, session, client):
+        """No API key should return 401"""
+        # Arrange KB
+        kb = KnowledgeBase(name="Single KB", description="KB for single doc")
+        session.add(kb)
+        session.commit()
+        kb_id = kb.id
+
+        file_content = b"hello world"
+        files = [
+            ("files", ("test.txt", io.BytesIO(file_content), "text/plain")),
+        ]
+
+        res = await client.post(
+            app.url_path_for("v1_upload_kb_documents", kb_id=kb_id),
+            files=files,
+        )
+        assert res.status_code == 401
+        assert res.json()["detail"] == "API key required"
+
     async def test_upload_single_document(
         self, client, app, session, api_key_value, patch_kb_route_services
     ):

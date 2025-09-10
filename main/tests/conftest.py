@@ -183,3 +183,28 @@ def mock_openai_embeddings():
         mock_instance = MagicMock()
         mock_class.return_value = mock_instance
         yield mock_instance, mock_class
+
+
+@pytest.fixture
+def patch_kb_route_services():
+    """
+    patch dependency router.delete_knowledge_base.
+    return (mock_minio_client, mock_vector_store, mock_embeddings).
+    """
+    with patch(
+        "app.api.v1.knowledge_base.router.get_minio_client"
+    ) as mock_get_minio_client, patch(
+        "app.api.v1.knowledge_base.router.ChromaVectorStore"
+    ) as mock_chroma_cls, patch(
+        "app.api.v1.knowledge_base.router.EmbeddingsFactory.create"
+    ) as mock_embeddings_create:
+
+        mock_minio_client = MagicMock()
+        mock_vector_store = MagicMock()
+        mock_embeddings = MagicMock()
+
+        mock_get_minio_client.return_value = mock_minio_client
+        mock_chroma_cls.return_value = mock_vector_store
+        mock_embeddings_create.return_value = mock_embeddings
+
+        yield mock_minio_client, mock_vector_store, mock_embeddings

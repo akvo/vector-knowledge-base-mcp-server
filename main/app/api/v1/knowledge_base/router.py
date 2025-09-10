@@ -1,7 +1,7 @@
 import logging
 import hashlib
 
-from typing import List, Any
+from typing import List, Any, Dict
 from fastapi import (
     APIRouter,
     Depends,
@@ -20,10 +20,12 @@ from .schema import (
     KnowledgeBaseCreate,
     KnowledgeBaseResponse,
     KnowledgeBaseUpdate,
+    PreviewRequest,
 )
 from app.services.minio_service import get_minio_client
 from app.services.embedding_factory import EmbeddingsFactory
 from app.services.chromadb_service import ChromaVectorStore
+from app.services.document_processor import preview_document, PreviewResult
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -296,5 +298,57 @@ async def upload_kb_documents(
                 "skip_processing": False,
             }
         )
+
+    return results
+
+
+@router.post("/{kb_id}/documents/preview")
+async def preview_kb_documents(
+    kb_id: int,
+    preview_request: PreviewRequest,
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
+) -> Dict[int, PreviewResult]:
+    """
+    Preview multiple documents' chunks.
+    """
+    results = {}
+    for doc_id in preview_request.document_ids:
+        document = (
+            db.query(Document)
+            .join(KnowledgeBase)
+            .filter(
+                Document.id == doc_id,
+                Document.knowledge_base_id == kb_id,
+            )
+            .first()
+        )
+
+        if document:
+            file_path = document.file_path
+        else:
+            upload = (
+                db.query(DocumentUpload)
+                .join(KnowledgeBase)
+                .filter(
+                    DocumentUpload.id == doc_id,
+                    DocumentUpload.knowledge_base_id == kb_id,
+                )
+                .first()
+            )
+
+            if not upload:
+                raise HTTPException(
+                    status_code=404, detail=f"Document {doc_id} not found"
+                )
+
+            file_path = upload.temp_path
+
+        preview = await preview_document(
+            file_path,
+            chunk_size=preview_request.chunk_size,
+            chunk_overlap=preview_request.chunk_overlap,
+        )
+        results[doc_id] = preview
 
     return results

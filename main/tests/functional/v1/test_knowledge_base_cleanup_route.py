@@ -1,6 +1,5 @@
 import pytest
 
-from unittest.mock import patch, MagicMock
 from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
@@ -26,16 +25,17 @@ class TestCleanupTempFilesRoute:
         assert res.status_code == 401
         assert res.json()["detail"] == "API key required"
 
-    @patch("app.api.v1.knowledge_base.router.get_minio_client")
     async def test_cleanup_temp_files_success(
         self,
-        mock_minio,
         app: FastAPI,
         session: Session,
         client: AsyncClient,
         api_key_value: str,
+        patch_kb_route_services,
     ):
         """Expired uploads should be deleted from DB and MinIO"""
+        mock_minio, _, _ = patch_kb_route_services
+
         kb = KnowledgeBase(name="KB Cleanup", description="desc")
         session.add(kb)
         session.commit()
@@ -71,9 +71,6 @@ class TestCleanupTempFilesRoute:
         expired_id = expired_upload.id
         fresh_id = fresh_upload.id
 
-        mock_client = MagicMock()
-        mock_minio.return_value = mock_client
-
         response = await client.post(
             app.url_path_for("v1_cleanup_temp_files"),
             headers=self.get_headers(api_key_value),
@@ -94,23 +91,24 @@ class TestCleanupTempFilesRoute:
             is not None
         )
         # MinIO deletion called
-        mock_client.remove_object.assert_called_once_with(
+        mock_minio.remove_object.assert_called_once_with(
             bucket_name=settings.minio_bucket_name, object_name="tmp/old.txt"
         )
 
-    @patch("app.api.v1.knowledge_base.router.get_minio_client")
     async def test_cleanup_temp_files_minio_failure(
         self,
-        mock_minio,
         app: FastAPI,
         session: Session,
         client: AsyncClient,
         api_key_value: str,
+        patch_kb_route_services,
     ):
         """
         Expired uploads should still be removed from DB even if MinIO deletion
         fails
         """
+        mock_minio, _, _ = patch_kb_route_services
+
         kb = KnowledgeBase(name="KB Cleanup2", description="desc")
         session.add(kb)
         session.commit()
@@ -131,8 +129,7 @@ class TestCleanupTempFilesRoute:
         # save ID before commit
         expired_id = expired_upload.id
 
-        mock_client = MagicMock()
-        mock_client.remove_object.side_effect = MinioException(
+        mock_minio.remove_object.side_effect = MinioException(
             code="500",
             message="MinIO failed",
             resource="test-resource",
@@ -140,7 +137,6 @@ class TestCleanupTempFilesRoute:
             host_id="host-123",
             response=None,
         )
-        mock_minio.return_value = mock_client
 
         response = await client.post(
             app.url_path_for("v1_cleanup_temp_files"),
@@ -157,6 +153,6 @@ class TestCleanupTempFilesRoute:
             is None
         )
         # minio deletion attempted
-        mock_client.remove_object.assert_called_once_with(
+        mock_minio.remove_object.assert_called_once_with(
             bucket_name=settings.minio_bucket_name, object_name="tmp/bad.txt"
         )

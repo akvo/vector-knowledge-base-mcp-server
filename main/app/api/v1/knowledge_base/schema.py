@@ -1,5 +1,6 @@
 from typing import List, Optional
 from datetime import datetime
+from pydantic import BaseModel
 
 from app.schemas.knowledge_schema import (
     KnowledgeBaseBase,
@@ -73,3 +74,9 @@ class KnowledgeBaseResponse(KnowledgeBaseBase):
 
 class PreviewRequest(PreviewRequest):
     pass
+
+
+class TestRetrievalRequest(BaseModel):
+    query: str
+    kb_id: int
+    top_k: int

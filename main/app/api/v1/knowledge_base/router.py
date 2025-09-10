@@ -31,6 +31,7 @@ from .schema import (
     KnowledgeBaseUpdate,
     PreviewRequest,
     DocumentResponse,
+    TestRetrievalRequest,
 )
 from app.services.minio_service import get_minio_client
 from app.services.embedding_factory import EmbeddingsFactory
@@ -571,3 +572,59 @@ async def get_document(
         raise HTTPException(status_code=404, detail="Document not found")
 
     return document
+
+
+@router.post("/test-retrieval", name="v1_test_retrieval")
+async def test_retrieval(
+    request: TestRetrievalRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
+) -> Any:
+    """
+    Test retrieval quality for a given query against a knowledge base.
+    """
+    try:
+        kb = (
+            db.query(KnowledgeBase)
+            .filter(
+                KnowledgeBase.id == request.kb_id,
+            )
+            .first()
+        )
+
+        if not kb:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Knowledge base {request.kb_id} not found",
+            )
+
+        embeddings = EmbeddingsFactory.create()
+
+        vector_store = ChromaVectorStore(
+            collection_name=f"kb_{request.kb_id}",
+            embedding_function=embeddings,
+        )
+
+        results = vector_store.similarity_search_with_score(
+            request.query, k=request.top_k
+        )
+
+        response = []
+        for doc, score in results:
+            response.append(
+                {
+                    "content": doc.page_content,
+                    "metadata": doc.metadata,
+                    "score": float(score),
+                }
+            )
+
+        return {"results": response}
+
+    except HTTPException:
+        # let FastAPI handle HTTPException
+        raise
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

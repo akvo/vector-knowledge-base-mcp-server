@@ -1,10 +1,12 @@
 import logging
+import hashlib
 
 from typing import List, Any
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    UploadFile,
 )
 from sqlalchemy.orm import Session
 from minio.error import MinioException
@@ -13,10 +15,7 @@ from app.core.config import settings
 from app.db.connection import get_session
 from app.core.security import get_api_key
 from app.models.api_key import APIKey
-from app.models.knowledge import (
-    KnowledgeBase,
-    Document,
-)
+from app.models.knowledge import KnowledgeBase, Document, DocumentUpload
 from .schema import (
     KnowledgeBaseCreate,
     KnowledgeBaseResponse,
@@ -209,3 +208,93 @@ async def delete_knowledge_base(
             status_code=500,
             detail=f"Failed to delete knowledge base: {str(e)}",
         )
+
+
+# Batch upload documents
+@router.post("/{kb_id}/documents/upload", name="v1_upload_kb_documents")
+async def upload_kb_documents(
+    kb_id: int,
+    files: List[UploadFile],
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
+):
+    """
+    Upload multiple documents to MinIO.
+    """
+    kb = db.query(KnowledgeBase).filter(KnowledgeBase.id == kb_id).first()
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    results = []
+    for file in files:
+        # 1. Create hash
+        file_content = await file.read()
+        file_hash = hashlib.sha256(file_content).hexdigest()
+
+        # 2. Check for existing document with same name and hash
+        existing_document = (
+            db.query(Document)
+            .filter(
+                Document.file_name == file.filename,
+                Document.file_hash == file_hash,
+                Document.knowledge_base_id == kb_id,
+            )
+            .first()
+        )
+
+        if existing_document:
+            # Skip processing if already exists
+            results.append(
+                {
+                    "document_id": existing_document.id,
+                    "file_name": existing_document.file_name,
+                    "status": "exists",
+                    "message": "Document already exists, skipping upload",
+                    "skip_processing": True,
+                }
+            )
+            continue
+
+        # 3. Upload to MinIO
+        temp_path = f"kb_{kb_id}/temp/{file.filename}"
+        await file.seek(0)
+        try:
+            minio_client = get_minio_client()
+            file_size = len(file_content)  # Get file size
+            minio_client.put_object(
+                bucket_name=settings.minio_bucket_name,
+                object_name=temp_path,
+                data=file.file,
+                length=file_size,  # Specify the correct file size
+                content_type=file.content_type,
+            )
+        except MinioException as e:
+            logger.error(f"Failed to upload file to MinIO: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail="Failed to upload file"
+            )
+
+        # 4. Create DocumentUpload record
+        upload = DocumentUpload(
+            knowledge_base_id=kb_id,
+            file_name=file.filename,
+            file_hash=file_hash,
+            file_size=len(file_content),
+            content_type=file.content_type,
+            temp_path=temp_path,
+        )
+        db.add(upload)
+        db.commit()
+        db.refresh(upload)
+
+        results.append(
+            {
+                "upload_id": upload.id,
+                "file_name": file.filename,
+                "temp_path": temp_path,
+                "status": "pending",
+                "skip_processing": False,
+            }
+        )
+
+    return results

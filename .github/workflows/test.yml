@@ -23,23 +23,7 @@ jobs:
       - name: Start isolated test services
         run: docker compose -f docker-compose.test.yml up -d --build
 
-      - name: Wait for MinIO
-        run: |
-          echo "Waiting for MinIO..."
-          until curl -s -f http://localhost:9100/minio/health/live >/dev/null 2>&1; do
-            sleep 2
-          done
-          echo "MinIO is ready."
-
-      - name: Wait for ChromaDB
-        run: |
-          echo "Waiting for ChromaDB..."
-          until curl -s http://localhost:8102/api/v2/heartbeat | grep "nanosecond heartbeat" >/dev/null 2>&1; do
-            sleep 2
-          done
-          echo "ChromaDB is ready."
-
-      - name: Run integration tests
+      - name: Run tests
         run: docker compose exec -T main bash /test.sh
 
       - name: Show logs if failure

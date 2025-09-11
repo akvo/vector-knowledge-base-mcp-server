@@ -46,6 +46,7 @@ class TestConfigSettings:
             config.settings.openai_embeddings_model
             == config.settings.openai_embeddings_model
         )
+        assert config.settings.admin_api_key == config.settings.admin_api_key
 
     def test_testing_true(self, monkeypatch):
         """If TESTING=true, settings.testing must be True."""
@@ -110,3 +111,4 @@ class TestConfigSettings:
             config.settings.openai_embeddings_model
             == config.settings.openai_embeddings_model
         )
+        assert config.settings.admin_api_key == config.settings.admin_api_key

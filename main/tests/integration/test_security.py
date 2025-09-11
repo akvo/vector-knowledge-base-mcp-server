@@ -3,9 +3,10 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.security import get_api_key
+from app.core.security import get_api_key, verify_admin_key
 from app.services.api_key_service import APIKeyService
 from app.models.api_key import APIKey
+from app.core.config import settings
 
 
 @pytest.mark.asyncio
@@ -53,3 +54,36 @@ class TestGetAPIKey:
             await get_api_key(authorization=header_value, db=session)
         assert exc.value.status_code == 401
         assert exc.value.detail == "Invalid or inactive API key"
+
+
+class TestVerifyAdminKey:
+    def test_valid_admin_key(self, monkeypatch):
+        """verify_admin_key should pass if correct Admin-Key is provided"""
+        header_value = f"Admin-Key {settings.admin_api_key}"
+        assert verify_admin_key(authorization=header_value) is True
+
+    def test_missing_header(self):
+        """verify_admin_key should raise 401 if header is missing"""
+        with pytest.raises(HTTPException) as exc:
+            verify_admin_key(authorization=None)
+        assert exc.value.status_code == 401
+        assert exc.value.detail == "Admin API key required"
+
+    def test_wrong_prefix(self):
+        """
+        verify_admin_key should raise 401 if header does not start with
+        Admin-Key
+        """
+        with pytest.raises(HTTPException) as exc:
+            verify_admin_key(authorization="API-Key something")
+        assert exc.value.status_code == 401
+        assert exc.value.detail == "Admin API key required"
+
+    def test_invalid_admin_key(self, monkeypatch):
+        """verify_admin_key should raise 403 if Admin-Key is incorrect"""
+        monkeypatch.setattr(settings, "admin_api_key", "supersecret")
+
+        with pytest.raises(HTTPException) as exc:
+            verify_admin_key(authorization="Admin-Key wrongkey")
+        assert exc.value.status_code == 403
+        assert exc.value.detail == "Admin privileges required"

@@ -5,6 +5,7 @@ import warnings
 import pytest
 import pytest_asyncio
 
+from fastmcp import Client
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from alembic import command
@@ -25,6 +26,7 @@ os.environ["TESTING"] = "1"
 from app.db.connection import get_db_url, get_session  # noqa
 from app.models.base import Base  # noqa
 from app.services.api_key_service import APIKeyService  # noqa
+from app.mcp.mcp_main import mcp  # noqa
 
 
 # -------------------------------
@@ -229,3 +231,9 @@ def patch_query_services():
         mock_store_cls.return_value = mock_vector_store
 
         yield mock_embeddings, mock_vector_store
+
+
+@pytest.fixture
+async def mcp_client():
+    async with Client(mcp) as client:
+        yield client

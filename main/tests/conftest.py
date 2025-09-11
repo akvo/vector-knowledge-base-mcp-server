@@ -208,3 +208,24 @@ def patch_kb_route_services():
         mock_embeddings_create.return_value = mock_embeddings
 
         yield mock_minio_client, mock_vector_store, mock_embeddings
+
+
+@pytest.fixture
+def patch_query_services():
+    """
+    Patch EmbeddingsFactory.create and ChromaVectorStore for query_vector_kbs.
+    Returns (mock_embeddings, mock_vector_store).
+    """
+    with patch(
+        "app.services.kb_query_service.EmbeddingsFactory.create"
+    ) as mock_emb, patch(
+        "app.services.kb_query_service.ChromaVectorStore"
+    ) as mock_store_cls:
+
+        mock_embeddings = MagicMock()
+        mock_emb.return_value = mock_embeddings
+
+        mock_vector_store = MagicMock()
+        mock_store_cls.return_value = mock_vector_store
+
+        yield mock_embeddings, mock_vector_store

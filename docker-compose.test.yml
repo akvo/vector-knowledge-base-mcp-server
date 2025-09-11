@@ -4,8 +4,6 @@ services:
       context: ./main
     depends_on:
       - db
-      - chroma_test
-      - minio_test
     env_file:
       - .env.test
     environment:

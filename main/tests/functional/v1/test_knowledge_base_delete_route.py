@@ -21,7 +21,7 @@ class TestDeleteKnowledgeBase:
         session.commit()
         kb_id = kb.id
 
-        mock_minio, mock_vector, _ = patch_kb_route_services
+        mock_minio, mock_vector, _, _ = patch_kb_route_services
         mock_minio.list_objects.return_value = []
 
         res = await client.delete(
@@ -43,7 +43,7 @@ class TestDeleteKnowledgeBase:
         session.commit()
         kb_id = kb.id
 
-        mock_minio, mock_vector, _ = patch_kb_route_services
+        mock_minio, mock_vector, _, _ = patch_kb_route_services
         mock_minio.list_objects.return_value = []
 
         response = await client.delete(
@@ -83,7 +83,7 @@ class TestDeleteKnowledgeBase:
         session.commit()
         kb_id = kb.id
 
-        mock_minio, _, _ = patch_kb_route_services
+        mock_minio, _, _, _ = patch_kb_route_services
         mock_minio.list_objects.side_effect = MinioException(
             code="500",
             message="MinIO down",
@@ -118,7 +118,7 @@ class TestDeleteKnowledgeBase:
         session.commit()
         kb_id = kb.id
 
-        mock_minio, mock_vector, _ = patch_kb_route_services
+        mock_minio, mock_vector, _, _ = patch_kb_route_services
         mock_minio.list_objects.return_value = []
         mock_vector.delete_collection.side_effect = Exception("Chroma down")
 
@@ -147,7 +147,7 @@ class TestDeleteKnowledgeBase:
         session.commit()
         kb_id = kb.id
 
-        mock_minio, mock_vector, _ = patch_kb_route_services
+        mock_minio, mock_vector, _, _ = patch_kb_route_services
         mock_minio.list_objects.return_value = []
         # simulate unexpected failure
         mock_minio.list_objects.side_effect = RuntimeError("Unexpected error")

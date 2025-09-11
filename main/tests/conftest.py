@@ -190,8 +190,11 @@ def mock_openai_embeddings():
 @pytest.fixture
 def patch_kb_route_services():
     """
-    patch dependency router.delete_knowledge_base.
-    return (mock_minio_client, mock_vector_store, mock_embeddings).
+    Patch external services in KB routes:
+    - MinIO client
+    - Chroma vector store
+    - EmbeddingsFactory
+    - preview_document
     """
     with patch(
         "app.api.v1.knowledge_base.router.get_minio_client"
@@ -199,17 +202,33 @@ def patch_kb_route_services():
         "app.api.v1.knowledge_base.router.ChromaVectorStore"
     ) as mock_chroma_cls, patch(
         "app.api.v1.knowledge_base.router.EmbeddingsFactory.create"
-    ) as mock_embeddings_create:
+    ) as mock_embeddings_create, patch(
+        "app.api.v1.knowledge_base.router.preview_document"
+    ) as mock_preview_doc:
 
         mock_minio_client = MagicMock()
         mock_vector_store = MagicMock()
         mock_embeddings = MagicMock()
 
+        # Stubs
+        mock_minio_client.put_object.return_value = None
+        mock_minio_client.list_objects.return_value = []
+        mock_minio_client.remove_object.return_value = None
+
         mock_get_minio_client.return_value = mock_minio_client
         mock_chroma_cls.return_value = mock_vector_store
         mock_embeddings_create.return_value = mock_embeddings
+        mock_preview_doc.return_value = {
+            "chunks": [{"content": "dummy content", "metadata": {"page": 1}}],
+            "total_chunks": 1,
+        }
 
-        yield mock_minio_client, mock_vector_store, mock_embeddings
+        yield (
+            mock_minio_client,
+            mock_vector_store,
+            mock_embeddings,
+            mock_preview_doc,
+        )
 
 
 @pytest.fixture

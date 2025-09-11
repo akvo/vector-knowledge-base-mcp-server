@@ -47,7 +47,7 @@ class TestTestRetrievalRoute:
         patch_kb_route_services,
     ):
         """Should return mocked search results"""
-        _, mock_vector_store, mock_embeddings = patch_kb_route_services
+        _, mock_vector_store, mock_embeddings, _ = patch_kb_route_services
 
         kb = KnowledgeBase(name="KB Retrieval", description="desc")
         session.add(kb)
@@ -101,7 +101,7 @@ class TestTestRetrievalRoute:
         patch_kb_route_services,
     ):
         """Should return 500 if vector store throws error"""
-        _, mock_vector_store, _ = patch_kb_route_services
+        _, mock_vector_store, _, _ = patch_kb_route_services
 
         kb = KnowledgeBase(name="KB Retrieval Fail", description="desc")
         session.add(kb)

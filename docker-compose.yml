@@ -54,6 +54,20 @@ services:
     networks:
       - app_network
 
+  script:
+    build:
+      context: ./script
+    depends_on:
+      - main
+    environment:
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+    volumes:
+      - ./script:/app
+    tty: true
+    command: ["tail", "-f", "/dev/null"]
+    networks:
+      - app_network
+
 volumes:
   pg-data:
   chroma_data:

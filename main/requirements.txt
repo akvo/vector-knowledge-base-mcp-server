@@ -17,9 +17,13 @@ psycopg2-binary==2.9.10
 SQLAlchemy==2.0.43
 minio==7.2.16
 pytest-mock==3.15.0
+pypdf==6.0.0
 
 chromadb==1.0.20
 langchain-core==0.3.75
 langchain-chroma==0.2.5
 langchain-openai==0.3.32
 langchain-community==0.3.29
+
+docx2txt==0.9
+python-docx==1.2.0

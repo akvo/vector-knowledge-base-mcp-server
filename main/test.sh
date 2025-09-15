@@ -47,8 +47,8 @@ case "$MODE" in
         ;;
     all)
         run_tests "not e2e and not mcp" "${COV_ARGS[@]}"
-        run_tests "e2e"
         run_tests "mcp"
+        run_tests "e2e"
         ;;
     *)
         echo "❌ Unknown mode: $MODE. Allowed modes: api, e2e, mcp, all"

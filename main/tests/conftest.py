@@ -253,7 +253,7 @@ def patch_query_services():
 
 
 #######
-@pytest.fixture(scope="function")
+@pytest.fixture
 def run_test_server():
     import uvicorn
     from multiprocessing import Process

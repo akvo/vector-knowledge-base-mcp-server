@@ -24,7 +24,7 @@ PYTEST_BASE_ARGS=(
 COV_ARGS=(
     --cov=app
     --cov-report=term-missing
-    --cov-report=xml:coverage_api.xml
+    --cov-report=xml:coverage.xml
 )
 
 # Function to run tests with a marker

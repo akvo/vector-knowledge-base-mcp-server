@@ -4,7 +4,7 @@ import base64
 from typing import List
 from sqlalchemy.orm import Session
 
-from app.db.connection import SessionLocal
+from app.db.connection import get_session
 from app.models.knowledge import KnowledgeBase, Document
 from app.services.chromadb_service import ChromaVectorStore
 from app.services.embedding_factory import EmbeddingsFactory
@@ -24,7 +24,7 @@ async def query_vector_kbs(
     Returns:
     - dict with base64 encoded context or error note.
     """
-    db: Session = SessionLocal()
+    db: Session = next(get_session())
     try:
         knowledge_bases = (
             db.query(KnowledgeBase)

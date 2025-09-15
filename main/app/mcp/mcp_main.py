@@ -1,9 +1,15 @@
-from fastmcp import FastMCP
 from typing import List
-
 from app.services.kb_query_service import query_vector_kbs
 
-mcp = FastMCP("Vector Knowledge Base MCP Server")
+from app.mcp.secure_mcp import SecureFastMCP
+from app.mcp.mcp_auth import APIKeyAuthProvider
+
+
+# User SecureFastMCP + APIKeyAuthProvider
+mcp = SecureFastMCP(
+    name="Vector Knowledge Base MCP Server",
+    auth=APIKeyAuthProvider(),
+)
 
 
 @mcp.resource(
@@ -42,5 +48,5 @@ async def query_knowledge_base(
     )
 
 
-# Create ASGI app from MCP server
-mcp_app = mcp.http_app(path="/mcp")
+# Create ASGI app from SecureMCP
+mcp_app = mcp.http_app(path="/")

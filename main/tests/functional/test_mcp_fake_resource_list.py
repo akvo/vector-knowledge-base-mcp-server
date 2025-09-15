@@ -3,6 +3,7 @@ import json
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp
 class TestMCPResourceListSample:
     async def test_sample_resource(self, mcp_client):
         resources = await mcp_client.list_resources()

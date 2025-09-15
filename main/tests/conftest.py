@@ -26,7 +26,7 @@ os.environ["TESTING"] = "1"
 from app.db.connection import get_db_url, get_session  # noqa
 from app.models.base import Base  # noqa
 from app.services.api_key_service import APIKeyService  # noqa
-from app.mcp.mcp_main import mcp  # noqa
+from app.mcp.mcp_main import mcp_app  # noqa
 
 
 # -------------------------------
@@ -252,7 +252,55 @@ def patch_query_services():
         yield mock_embeddings, mock_vector_store
 
 
-@pytest.fixture
-async def mcp_client():
-    async with Client(mcp) as client:
+#######
+@pytest.fixture(scope="function")
+def run_test_server():
+    import uvicorn
+    from multiprocessing import Process
+    import requests
+    from app.main import app as main_app
+
+    check_test_db_url()
+
+    engine = create_engine(get_db_url())
+    TestingSessionLocal = sessionmaker(bind=engine)
+
+    def override_get_db():
+        try:
+            db = TestingSessionLocal()
+            yield db
+        finally:
+            db.close()
+
+    main_app.dependency_overrides[get_session] = override_get_db
+
+    def run_uvicorn():
+        uvicorn.run(main_app, host="127.0.0.1", port=8001, log_level="info")
+
+    process = Process(target=run_uvicorn, daemon=True)
+    process.start()
+
+    # Wait server ready
+    for _ in range(10):
+        try:
+            r = requests.get("http://127.0.0.1:8001/api/health")
+            if r.status_code == 200:
+                break
+        except Exception:
+            time.sleep(0.5)
+    else:
+        process.terminate()
+        process.join()
+        raise RuntimeError("Server failed to start")
+
+    yield "http://127.0.0.1:8001"
+
+    process.terminate()
+    process.join()
+
+
+@pytest_asyncio.fixture
+async def mcp_client(api_key_value: str, run_test_server: str):
+    url = f"{run_test_server}/mcp/"
+    async with Client(url, auth=f"API-Key {api_key_value}") as client:
         yield client

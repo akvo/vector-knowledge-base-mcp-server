@@ -137,8 +137,27 @@ OPENAI_EMBEDDINGS_MODEL=text-embedding-ada-002
    ```
 
 5. **Running pytest**
+   - Running FastAPI endpoint test
+
    ```bash
-   ./dev.sh exec main ./test.sh
+   ./dev.sh exec main ./test.sh api
+   ```
+
+   - Running e2e test
+
+   ```bash
+   ./dev.sh exec main ./test.sh e2e
+   ```
+   - Running FastMCP test
+
+   ```bash
+   ./dev.sh exec main ./test.sh mcp
+   ```
+
+   - Running All test
+
+   ```bash
+   ./dev.sh exec main ./test.sh all
    ```
 
 ### Production Setup

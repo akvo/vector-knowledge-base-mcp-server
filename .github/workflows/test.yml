@@ -23,11 +23,14 @@ jobs:
       - name: Start isolated test services
         run: docker compose -f docker-compose.test.yml up -d --build
 
-      - name: Run integration tests
-        run: docker compose exec -T main bash /test.sh integration
+      - name: Run API tests
+        run: docker compose exec -T main bash /test.sh api
 
       - name: Run e2e tests
         run: docker compose exec -T main bash /test.sh e2e
+
+      - name: Run MCP tests
+        run: docker compose exec -T main bash /test.sh mcp
 
       - name: Show logs if failure
         if: failure()

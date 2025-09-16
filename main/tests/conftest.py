@@ -153,6 +153,7 @@ def patch_external_services(monkeypatch, tmp_path):
         document_processor,
         kb_query_service,
         chromadb_service,
+        minio_service,
     )
 
     # ---------- MinIO mock ----------
@@ -171,6 +172,7 @@ def patch_external_services(monkeypatch, tmp_path):
     monkeypatch.setattr(
         document_processor, "get_minio_client", lambda: mock_minio
     )
+    monkeypatch.setattr(minio_service, "get_minio_client", lambda: mock_minio)
 
     # ---------- Embeddings ----------
     mock_embeddings = MagicMock()

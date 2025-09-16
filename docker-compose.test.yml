@@ -4,6 +4,7 @@ services:
       context: ./main
     depends_on:
       - db
+      - minio_test
     env_file:
       - .env.test
     environment:
@@ -29,9 +30,24 @@ services:
     networks:
       - test_network
 
+  minio_test:
+    image: minio/minio:latest
+    ports:
+      - 9100:9000 # API port
+      - 9101:9001 # Console port
+    environment:
+      - MINIO_ROOT_USER=testaccess
+      - MINIO_ROOT_PASSWORD=testsecret
+    volumes:
+      - minio-test-data:/data
+    command: server --console-address ":9101" /data
+    networks:
+      - test_network
+
 
 volumes:
   pg-test-data:
+  minio-test-data:
 
 networks:
   test_network:

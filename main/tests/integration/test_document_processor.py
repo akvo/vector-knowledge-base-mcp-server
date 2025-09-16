@@ -1,7 +1,7 @@
 import io
 import pytest
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 from fastapi import UploadFile
 
 from app.services import document_processor
@@ -31,11 +31,8 @@ class TestDocumentProcessor:
         assert h1 == h2
         assert cid1 == cid2
 
-    @patch("app.services.document_processor.get_minio_client")
-    async def test_upload_document_success(self, mock_minio):
-        mock_client = MagicMock()
-        mock_minio.return_value = mock_client
-
+    async def test_upload_document_success(self, patch_external_services):
+        mock_minio = patch_external_services["mock_minio"]
         file_content = b"Hello world"
         upload_file = UploadFile(
             filename="test.txt", file=io.BytesIO(file_content)
@@ -46,54 +43,42 @@ class TestDocumentProcessor:
         assert result.file_name == "test.txt"
         assert result.file_size == len(file_content)
         assert result.content_type == "text/plain"
-        mock_client.put_object.assert_called_once()
+        mock_minio.put_object.assert_called_once()
 
-    @patch("app.services.document_processor.get_minio_client")
-    async def test_upload_document_failure(self, mock_minio):
-        mock_client = MagicMock()
-        mock_client.put_object.side_effect = Exception("upload failed")
-        mock_minio.return_value = mock_client
+    async def test_upload_document_failure(self, patch_external_services):
+        mock_minio = patch_external_services["mock_minio"]
+        mock_minio.put_object.side_effect = Exception("upload failed")
 
         upload_file = UploadFile(filename="fail.txt", file=io.BytesIO(b"abc"))
 
         with pytest.raises(Exception, match="upload failed"):
             await document_processor.upload_document(upload_file, kb_id=1)
 
-    @patch("app.services.document_processor.get_minio_client")
-    async def test_preview_document_txt(self, mock_minio, tmp_path):
-        # dummy file
-        file_path = "kb_1/test.txt"
-        local_file = tmp_path / "test.txt"
-        local_file.write_text("Hello world. This is a test document.")
-
-        mock_client = MagicMock()
-        mock_client.fget_object.side_effect = (
-            lambda bucket_name, object_name, file_path: local_file.rename(
-                file_path
-            )
-        )
-        mock_minio.return_value = mock_client
-
+    async def test_preview_document_txt(self, patch_external_services):
+        # Call preview_document async mock
+        _ = patch_external_services["mock_preview"]
         result = await document_processor.preview_document(
-            file_path, chunk_size=10, chunk_overlap=0
+            "dummy.txt", chunk_size=10, chunk_overlap=0
         )
-
-        assert result.total_chunks > 0
+        assert result.total_chunks == 2
         assert all(isinstance(c.content, str) for c in result.chunks)
 
-    @patch("app.services.document_processor.EmbeddingsFactory")
-    @patch("app.services.document_processor.ChromaVectorStore")
-    @patch("app.services.document_processor.ChunkRecord")
-    @patch("app.services.document_processor.preview_document")
     async def test_process_document_add_and_delete(
-        self,
-        mock_preview,
-        mock_chunk_record,
-        mock_chroma,
-        mock_embeddings,
-        session,
+        self, patch_external_services, session
     ):
-        # arrange DB
+        _ = patch_external_services["mock_preview"]
+        mock_vs = patch_external_services["mock_vector_store"]
+        mock_manager = MagicMock()
+        mock_manager.list_chunks.return_value = set()
+        mock_manager.get_deleted_chunks.return_value = ["oldchunk"]
+
+        # Patch ChunkRecord
+        document_processor.ChunkRecord = MagicMock(return_value=mock_manager)
+        document_processor.ChromaVectorStore = MagicMock(return_value=mock_vs)
+        document_processor.EmbeddingsFactory.create = (
+            lambda: patch_external_services["mock_embeddings"]
+        )
+
         kb = KnowledgeBase(name="KB1", description="desc")
         session.add(kb)
         session.commit()
@@ -109,30 +94,6 @@ class TestDocumentProcessor:
         session.add(doc)
         session.commit()
 
-        # mock preview result
-        mock_preview.return_value = document_processor.PreviewResult(
-            chunks=[
-                document_processor.TextChunk(
-                    content="hello", metadata={"page": 1}
-                ),
-                document_processor.TextChunk(
-                    content="world", metadata={"page": 2}
-                ),
-            ],
-            total_chunks=2,
-        )
-
-        # mock chunk record
-        mock_manager = MagicMock()
-        mock_manager.list_chunks.return_value = set()
-        mock_manager.get_deleted_chunks.return_value = ["oldchunk"]
-        mock_chunk_record.return_value = mock_manager
-
-        # mock vector store
-        mock_vs = MagicMock()
-        mock_chroma.return_value = mock_vs
-
-        # act
         await document_processor.process_document(
             file_path="doc.txt",
             file_name="doc.txt",
@@ -140,15 +101,13 @@ class TestDocumentProcessor:
             document_id=doc.id,
         )
 
-        # assert new chunks
         assert mock_manager.add_chunks.called
         assert mock_vs.add_documents.called
         assert mock_manager.delete_chunks.called
         assert mock_vs.delete.called
 
-    @patch("app.services.document_processor.get_minio_client")
     async def test_process_document_background_task_not_found(
-        self, mock_minio, session
+        self, patch_external_services, session
     ):
         await document_processor.process_document_background(
             temp_path="tmp/test.txt",
@@ -158,11 +117,8 @@ class TestDocumentProcessor:
             db=session,
         )
 
-    @patch("app.services.document_processor.get_minio_client")
-    @patch("app.services.document_processor.EmbeddingsFactory")
-    @patch("app.services.document_processor.ChromaVectorStore")
     async def test_process_document_background_success(
-        self, mock_chroma, mock_embeddings, mock_minio, session, tmp_path
+        self, patch_external_services, session, tmp_path
     ):
         kb = KnowledgeBase(name="KB2", description="desc")
         session.add(kb)
@@ -188,27 +144,7 @@ class TestDocumentProcessor:
         session.add(task)
         session.commit()
 
-        # minio dummy file
-        dummy_file = tmp_path / "test.txt"
-        dummy_file.write_text("Hello world again")
-
-        mock_client = MagicMock()
-
-        def mock_fget_object(*args, **kwargs):
-            dest = kwargs.get("file_path") or args[2]
-            dummy_file.rename(dest)
-
-        mock_client.fget_object.side_effect = mock_fget_object
-        mock_client.copy_object.return_value = None
-        mock_client.remove_object.return_value = None
-        mock_minio.return_value = mock_client
-
-        # mock embeddings + vector store
-        mock_embeddings.create.return_value = MagicMock()
-        mock_vs = MagicMock()
-        mock_chroma.return_value = mock_vs
-
-        # act
+        # background processing
         await document_processor.process_document_background(
             temp_path="tmp/test.txt",
             file_name="test.txt",
@@ -218,7 +154,11 @@ class TestDocumentProcessor:
         )
 
         session.refresh(task)
+        session.refresh(upload)
+
         assert task.status == "completed"
         assert task.document_id is not None
         assert upload.status == "completed"
-        assert mock_vs.add_documents.called
+        patch_external_services[
+            "mock_vector_store"
+        ].add_documents.assert_called()

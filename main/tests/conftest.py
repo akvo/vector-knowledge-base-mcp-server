@@ -12,7 +12,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from httpx import AsyncClient, ASGITransport
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -30,7 +30,7 @@ from app.mcp.mcp_main import mcp_app  # noqa
 
 
 # -------------------------------
-# Helper: ensure _test in DB URL
+# Helper functions
 # -------------------------------
 def check_test_db_url():
     db_url = get_db_url()
@@ -42,9 +42,6 @@ def check_test_db_url():
     print(f"✅ Using test database URL: {db_url}")
 
 
-# -------------------------------
-# Helper: wait for DB ready
-# -------------------------------
 def wait_for_db(max_retries: int = 10, delay: int = 2):
     engine = create_engine(get_db_url())
     for i in range(max_retries):
@@ -73,7 +70,7 @@ def apply_migrations():
 
 
 # -------------------------------
-# Session fixture: truncate tables before each test
+# Database session fixture
 # -------------------------------
 @pytest.fixture
 def session() -> Session:
@@ -82,7 +79,7 @@ def session() -> Session:
     TestingSessionLocal = sessionmaker(bind=engine)
     session = TestingSessionLocal()
 
-    # Truncate
+    # Truncate tables
     with engine.connect() as conn:
         for table in reversed(Base.metadata.sorted_tables):
             conn.execute(
@@ -96,7 +93,7 @@ def session() -> Session:
 
 
 # -------------------------------
-# FastAPI test client with dependency override
+# FastAPI app and client fixtures
 # -------------------------------
 @pytest.fixture
 def app(apply_migrations: None) -> FastAPI:
@@ -129,6 +126,9 @@ async def client(app: FastAPI) -> AsyncClient:
         yield c
 
 
+# -------------------------------
+# API key fixture
+# -------------------------------
 @pytest.fixture(scope="function")
 def api_key_value(session: Session) -> str:
     """Create a global API key for tests"""
@@ -136,57 +136,81 @@ def api_key_value(session: Session) -> str:
     return api_key.key
 
 
+# -------------------------------
+# Global mocks for external services
+# -------------------------------
 @pytest.fixture
-def mock_chroma():
+def patch_external_services(monkeypatch, tmp_path):
     """
-    Fixture to mock chromadb.HttpClient and Chroma store.
+    Patch external services:
+    MinIO client, Embeddings, Vector Store, and preview_document
     """
-    with patch(
-        "app.services.chromadb_service.chromadb.HttpClient"
-    ) as mock_client, patch(
-        "app.services.chromadb_service.Chroma"
-    ) as mock_store:
-        mock_instance = mock_store.return_value
-        mock_collection = mock_instance._collection
-        yield {
-            "mock_client": mock_client,
-            "mock_store": mock_store,
-            "mock_instance": mock_instance,
-            "mock_collection": mock_collection,
-        }
+    from app.services import document_processor
+
+    # MinIO mock
+    mock_minio = MagicMock()
+
+    def mock_fget_object(*args, **kwargs):
+        file_path = kwargs.get("file_path") or args[2]
+        dummy_file = tmp_path / "test.txt"
+        dummy_file.write_text("dummy content")
+        dummy_file.rename(file_path)
+
+    mock_minio.fget_object.side_effect = mock_fget_object
+    mock_minio.put_object.return_value = None
+    mock_minio.copy_object.return_value = None
+    mock_minio.remove_object.return_value = None
+    monkeypatch.setattr(
+        document_processor, "get_minio_client", lambda: mock_minio
+    )
+
+    # Embeddings
+    mock_embeddings = MagicMock()
+    mock_embeddings.create.return_value = MagicMock()
+    monkeypatch.setattr(
+        document_processor.EmbeddingsFactory, "create", lambda: mock_embeddings
+    )
+
+    # Vector store
+    mock_vs = MagicMock()
+    monkeypatch.setattr(
+        document_processor, "ChromaVectorStore", lambda *a, **k: mock_vs
+    )
+    # Mock retriever async
+    mock_retriever = AsyncMock()
+    mock_retriever.aget_relevant_documents.return_value = [
+        type(
+            "Doc", (), {"page_content": "mock content", "metadata": {"id": 1}}
+        )()
+    ]
+    mock_vs.as_retriever.return_value = mock_retriever
+
+    # Preview document
+    mock_preview = AsyncMock()
+    mock_preview.return_value = document_processor.PreviewResult(
+        chunks=[
+            document_processor.TextChunk(
+                content="hello", metadata={"page": 1}
+            ),
+            document_processor.TextChunk(
+                content="world", metadata={"page": 2}
+            ),
+        ],
+        total_chunks=2,
+    )
+    monkeypatch.setattr(document_processor, "preview_document", mock_preview)
+
+    return {
+        "mock_minio": mock_minio,
+        "mock_embeddings": mock_embeddings,
+        "mock_vector_store": mock_vs,
+        "mock_preview": mock_preview,
+    }
 
 
-@pytest.fixture
-def mock_minio_client():
-    with patch(
-        "app.services.minio_service.get_minio_client"
-    ) as mock_get_client:
-        mock_client = MagicMock()
-        mock_get_client.return_value = mock_client
-        yield mock_client
-
-
-@pytest.fixture
-def mock_minio_class():
-    with patch("app.services.minio_service.Minio") as mock_minio_cls:
-        yield mock_minio_cls
-
-
-@pytest.fixture
-def mock_openai_embeddings():
-    """
-    Fixture to mock OpenAIEmbeddings class from langchain_openai.
-    Returns the MagicMock instance and the patcher so it can be asserted if
-    needed.
-    """
-    with patch(
-        "app.services.embedding_factory.OpenAIEmbeddings"
-    ) as mock_class:
-        mock_instance = MagicMock()
-        mock_class.return_value = mock_instance
-        yield mock_instance, mock_class
-
-
+# -------------------------------
+# Mocks KB route service
+# -------------------------------
 @pytest.fixture
 def patch_kb_route_services():
     """
@@ -206,15 +230,17 @@ def patch_kb_route_services():
         "app.api.v1.knowledge_base.router.preview_document"
     ) as mock_preview_doc:
 
+        # Create mock instances
         mock_minio_client = MagicMock()
         mock_vector_store = MagicMock()
         mock_embeddings = MagicMock()
 
-        # Stubs
+        # Stub MinIO client methods
         mock_minio_client.put_object.return_value = None
         mock_minio_client.list_objects.return_value = []
         mock_minio_client.remove_object.return_value = None
 
+        # Assign mocks to patch targets
         mock_get_minio_client.return_value = mock_minio_client
         mock_chroma_cls.return_value = mock_vector_store
         mock_embeddings_create.return_value = mock_embeddings
@@ -223,6 +249,7 @@ def patch_kb_route_services():
             "total_chunks": 1,
         }
 
+        # Yield all mocks for use in tests
         yield (
             mock_minio_client,
             mock_vector_store,
@@ -231,28 +258,9 @@ def patch_kb_route_services():
         )
 
 
-@pytest.fixture
-def patch_query_services():
-    """
-    Patch EmbeddingsFactory.create and ChromaVectorStore for query_vector_kbs.
-    Returns (mock_embeddings, mock_vector_store).
-    """
-    with patch(
-        "app.services.kb_query_service.EmbeddingsFactory.create"
-    ) as mock_emb, patch(
-        "app.services.kb_query_service.ChromaVectorStore"
-    ) as mock_store_cls:
-
-        mock_embeddings = MagicMock()
-        mock_emb.return_value = mock_embeddings
-
-        mock_vector_store = MagicMock()
-        mock_store_cls.return_value = mock_vector_store
-
-        yield mock_embeddings, mock_vector_store
-
-
-#######
+# -------------------------------
+# MCP server and client fixtures
+# -------------------------------
 @pytest.fixture
 def run_test_server():
     import uvicorn

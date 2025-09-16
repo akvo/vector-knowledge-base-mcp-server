@@ -142,14 +142,18 @@ def api_key_value(session: Session) -> str:
 @pytest.fixture
 def patch_external_services(monkeypatch, tmp_path):
     """
-    Patch external services for both document_processor and kb_query_service:
+    Patch external services for
+    document_processor, kb_query_service, chromadb_service:
     - MinIO client
     - EmbeddingsFactory
     - ChromaVectorStore
     - preview_document
     """
-    from app.services import document_processor
-    from app.services import kb_query_service
+    from app.services import (
+        document_processor,
+        kb_query_service,
+        chromadb_service,
+    )
 
     # ---------- MinIO mock ----------
     mock_minio = MagicMock()
@@ -180,6 +184,21 @@ def patch_external_services(monkeypatch, tmp_path):
 
     # ---------- Vector store ----------
     mock_vs = MagicMock()
+    for method in [
+        "add_documents",
+        "add_embeddings",
+        "delete",
+        "delete_collection",
+        "similarity_search",
+        "similarity_search_with_score",
+        "similarity_search_by_vector",
+        "as_retriever",
+    ]:
+        setattr(mock_vs, method, MagicMock())
+
+    monkeypatch.setattr(
+        chromadb_service, "ChromaVectorStore", lambda *a, **k: mock_vs
+    )
     monkeypatch.setattr(
         document_processor, "ChromaVectorStore", lambda *a, **k: mock_vs
     )

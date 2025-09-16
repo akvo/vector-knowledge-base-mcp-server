@@ -142,12 +142,16 @@ def api_key_value(session: Session) -> str:
 @pytest.fixture
 def patch_external_services(monkeypatch, tmp_path):
     """
-    Patch external services:
-    MinIO client, Embeddings, Vector Store, and preview_document
+    Patch external services for both document_processor and kb_query_service:
+    - MinIO client
+    - EmbeddingsFactory
+    - ChromaVectorStore
+    - preview_document
     """
     from app.services import document_processor
+    from app.services import kb_query_service
 
-    # MinIO mock
+    # ---------- MinIO mock ----------
     mock_minio = MagicMock()
 
     def mock_fget_object(*args, **kwargs):
@@ -164,19 +168,26 @@ def patch_external_services(monkeypatch, tmp_path):
         document_processor, "get_minio_client", lambda: mock_minio
     )
 
-    # Embeddings
+    # ---------- Embeddings ----------
     mock_embeddings = MagicMock()
     mock_embeddings.create.return_value = MagicMock()
     monkeypatch.setattr(
         document_processor.EmbeddingsFactory, "create", lambda: mock_embeddings
     )
+    monkeypatch.setattr(
+        kb_query_service.EmbeddingsFactory, "create", lambda: mock_embeddings
+    )
 
-    # Vector store
+    # ---------- Vector store ----------
     mock_vs = MagicMock()
     monkeypatch.setattr(
         document_processor, "ChromaVectorStore", lambda *a, **k: mock_vs
     )
-    # Mock retriever async
+    monkeypatch.setattr(
+        kb_query_service, "ChromaVectorStore", lambda *a, **k: mock_vs
+    )
+
+    # Async retriever for kb_query_service
     mock_retriever = AsyncMock()
     mock_retriever.aget_relevant_documents.return_value = [
         type(
@@ -185,7 +196,7 @@ def patch_external_services(monkeypatch, tmp_path):
     ]
     mock_vs.as_retriever.return_value = mock_retriever
 
-    # Preview document
+    # ---------- Preview document ----------
     mock_preview = AsyncMock()
     mock_preview.return_value = document_processor.PreviewResult(
         chunks=[

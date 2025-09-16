@@ -2,7 +2,6 @@ import pytest
 import json
 import base64
 
-from unittest.mock import AsyncMock
 from sqlalchemy.orm import Session
 from app.models.knowledge import KnowledgeBase, Document
 from app.services.kb_query_service import query_vector_kbs
@@ -10,13 +9,13 @@ from app.services.kb_query_service import query_vector_kbs
 
 @pytest.mark.asyncio
 class TestQueryVectorKbsIntegration:
-    async def test_kb_not_found(self):
+    async def test_kb_not_found(self, patch_external_services):
         """Should return note if no KB found"""
         res = await query_vector_kbs("hello", [9999], top_k=3)
         assert res["context"] is None
         assert "No active knowledge base" in res["note"]
 
-    async def test_kb_empty(self, session: Session):
+    async def test_kb_empty(self, session: Session, patch_external_services):
         """Should return note if KB exists but has no documents"""
         kb = KnowledgeBase(name="KB Empty", description="desc")
         session.add(kb)
@@ -27,11 +26,9 @@ class TestQueryVectorKbsIntegration:
         assert f"Knowledge base {kb.id} is empty." in res["note"]
 
     async def test_success_retrieval(
-        self, session: Session, patch_query_services
+        self, session: Session, patch_external_services
     ):
         """Should return encoded context if retrieval works"""
-        _, mock_store = patch_query_services
-
         kb = KnowledgeBase(name="KB Retrieval", description="desc")
         session.add(kb)
         session.commit()
@@ -47,17 +44,6 @@ class TestQueryVectorKbsIntegration:
         session.add(doc)
         session.commit()
 
-        # Mock retriever with AsyncMock
-        mock_retriever = AsyncMock()
-        mock_retriever.aget_relevant_documents.return_value = [
-            type(
-                "Doc",
-                (),
-                {"page_content": "mock content", "metadata": {"id": 1}},
-            )()
-        ]
-        mock_store.as_retriever.return_value = mock_retriever
-
         res = await query_vector_kbs("hello", [kb.id], top_k=2)
 
         assert res["context"] is not None
@@ -66,10 +52,10 @@ class TestQueryVectorKbsIntegration:
         assert decoded["context"][0]["metadata"]["id"] == 1
 
     async def test_internal_error(
-        self, session: Session, patch_query_services
+        self, session: Session, patch_external_services
     ):
         """Should handle exceptions gracefully"""
-        _, mock_store = patch_query_services
+        mock_store = patch_external_services["mock_vector_store"]
 
         kb = KnowledgeBase(name="KB Error", description="desc")
         session.add(kb)
@@ -87,7 +73,7 @@ class TestQueryVectorKbsIntegration:
         session.add(doc)
         session.commit()
 
-        # Force error
+        # Force retriever error
         mock_store.as_retriever.side_effect = Exception("Vector store failed")
 
         res = await query_vector_kbs("hello", [kb.id], top_k=2)

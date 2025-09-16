@@ -295,6 +295,7 @@ def patch_kb_route_services():
 # -------------------------------
 @pytest.fixture
 def patch_mcp_server_vector_store(monkeypatch):
+    import base64
     from app.api.v1.knowledge_base import router as kb_router
 
     mock_store = MagicMock(name="MockChromaVectorStore")
@@ -304,7 +305,9 @@ def patch_mcp_server_vector_store(monkeypatch):
         "Doc",
         (),
         {
-            "page_content": "hello world, functional content",
+            "page_content": base64.b64encode(
+                b"hello world, functional content"
+            ).decode("utf-8"),
             "metadata": {"id": 1},
         },
     )()
@@ -312,7 +315,7 @@ def patch_mcp_server_vector_store(monkeypatch):
     mock_retriever.aget_relevant_documents.return_value = [mock_doc]
     mock_store.as_retriever.return_value = mock_retriever
 
-    # penting: return mock_store saat dipanggil constructor
+    # return mock_store
     monkeypatch.setattr(
         kb_router, "ChromaVectorStore", lambda *a, **k: mock_store
     )

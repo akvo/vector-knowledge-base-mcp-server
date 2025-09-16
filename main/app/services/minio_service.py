@@ -44,8 +44,7 @@ def init_minio():
     except S3Error as e:
         logger.error(
             f"MinIO S3Error while accessing bucket '{bucket_name}': "
-            f"code={e.code}, message={e.message}, resource={e.resource}, "
-            f"request_id={e.request_id}, host_id={e.host_id}"
+            f"MinIO S3Error: {e},"
         )
         raise
     except Exception as e:

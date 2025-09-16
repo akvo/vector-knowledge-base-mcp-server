@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from app.api.routes import router as api_router
 from app.mcp.mcp_main import mcp_app
 from app.services.minio_service import init_minio
+from app.core.config import settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,7 +18,8 @@ logging.basicConfig(
 @asynccontextmanager
 async def app_lifespan(app: FastAPI):
     logging.info("Starting up the app...")
-    init_minio()
+    if not settings.testing:
+        init_minio()
     yield
     logging.info("Shutting down the app...")
 

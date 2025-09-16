@@ -291,10 +291,40 @@ def patch_kb_route_services():
 
 
 # -------------------------------
+# Fixture to patch MCP server vector store
+# -------------------------------
+@pytest.fixture
+def patch_mcp_server_vector_store(monkeypatch):
+    from app.api.v1.knowledge_base import router as kb_router
+
+    mock_store = MagicMock(name="MockChromaVectorStore")
+    mock_retriever = AsyncMock(name="MockRetriever")
+
+    mock_doc = type(
+        "Doc",
+        (),
+        {
+            "page_content": "hello world, functional content",
+            "metadata": {"id": 1},
+        },
+    )()
+
+    mock_retriever.aget_relevant_documents.return_value = [mock_doc]
+    mock_store.as_retriever.return_value = mock_retriever
+
+    # penting: return mock_store saat dipanggil constructor
+    monkeypatch.setattr(
+        kb_router, "ChromaVectorStore", lambda *a, **k: mock_store
+    )
+
+    return mock_store
+
+
+# -------------------------------
 # MCP server and client fixtures
 # -------------------------------
 @pytest.fixture
-def run_test_server():
+def run_test_server(patch_mcp_server_vector_store):
     import uvicorn
     from multiprocessing import Process
     import requests

@@ -35,13 +35,11 @@ class TestQueryKnowledgeBaseFunctional:
             },
         )
 
-        # --- Debug Print ---
-        decoded_str = base64.b64decode(result.data["context"]).decode()
-        decoded = json.loads(decoded_str)
+        # --- Decode ---
+        decoded = json.loads(base64.b64decode(result.data["context"]).decode())
 
         # --- Assertions ---
         assert "context" in result.data
-        decoded = json.loads(base64.b64decode(result.data["context"]).decode())
         assert "context" in decoded
 
     async def test_query_empty_kb_functional(self, mcp_client, session):
@@ -58,9 +56,8 @@ class TestQueryKnowledgeBaseFunctional:
             },
         )
 
-        print("\n=== RAW MCP RESULT (empty KB) ===", result.data)
-
-        assert result.data["context"] is None
+        decoded = json.loads(base64.b64decode(result.data["context"]).decode())
+        assert decoded["context"] == []
         assert f"Knowledge base {kb.id} is empty." in result.data["note"]
 
     async def test_query_not_found_kb_functional(self, mcp_client):
@@ -73,7 +70,6 @@ class TestQueryKnowledgeBaseFunctional:
             },
         )
 
-        print("\n=== RAW MCP RESULT (not found KB) ===", result.data)
-
-        assert result.data["context"] is None
+        decoded = json.loads(base64.b64decode(result.data["context"]).decode())
+        assert decoded["context"] == []
         assert "No active knowledge base found" in result.data["note"]

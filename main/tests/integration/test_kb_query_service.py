@@ -12,7 +12,9 @@ class TestQueryVectorKbsIntegration:
     async def test_kb_not_found(self, patch_external_services):
         """Should return note if no KB found"""
         res = await query_vector_kbs("hello", [9999], top_k=3)
-        assert res["context"] is None
+        assert res["context"] is not None
+        decoded = json.loads(base64.b64decode(res["context"]).decode())
+        assert decoded["context"] == []
         assert "No active knowledge base" in res["note"]
 
     async def test_kb_empty(self, session: Session, patch_external_services):
@@ -22,7 +24,9 @@ class TestQueryVectorKbsIntegration:
         session.commit()
 
         res = await query_vector_kbs("hello", [kb.id], top_k=3)
-        assert res["context"] is None
+        assert res["context"] is not None
+        decoded = json.loads(base64.b64decode(res["context"]).decode())
+        assert decoded["context"] == []
         assert f"Knowledge base {kb.id} is empty." in res["note"]
 
     async def test_success_retrieval(
@@ -78,5 +82,7 @@ class TestQueryVectorKbsIntegration:
 
         res = await query_vector_kbs("hello", [kb.id], top_k=2)
 
-        assert res["context"] is None
+        assert res["context"] is not None
+        decoded = json.loads(base64.b64decode(res["context"]).decode())
+        assert decoded["context"] == []
         assert "Vector store failed" in res["note"]

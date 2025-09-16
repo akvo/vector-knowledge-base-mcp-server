@@ -25,6 +25,11 @@ async def query_vector_kbs(
     - dict with base64 encoded context or error note.
     """
     db: Session = next(get_session())
+
+    empty_context = base64.b64encode(
+        json.dumps({"context": []}).encode()
+    ).decode()
+
     try:
         knowledge_bases = (
             db.query(KnowledgeBase)
@@ -33,7 +38,7 @@ async def query_vector_kbs(
         )
         if not knowledge_bases:
             return {
-                "context": None,
+                "context": empty_context,
                 "note": "No active knowledge base found for given IDs.",
             }
 
@@ -47,8 +52,9 @@ async def query_vector_kbs(
             .all()
         )
         if not documents:
+
             return {
-                "context": None,
+                "context": empty_context,
                 "note": f"Knowledge base {kb.id} is empty.",
             }
 
@@ -74,6 +80,6 @@ async def query_vector_kbs(
         return {"context": base64_context}
 
     except Exception as e:
-        return {"context": None, "note": f"Error: {str(e)}"}
+        return {"context": empty_context, "note": f"Error: {str(e)}"}
     finally:
         db.close()

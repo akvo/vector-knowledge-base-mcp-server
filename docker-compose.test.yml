@@ -4,7 +4,7 @@ services:
       context: ./main
     depends_on:
       - db
-      - minio_test
+      - minio
     env_file:
       - .env.test
     environment:
@@ -30,18 +30,18 @@ services:
     networks:
       - test_network
 
-  minio_test:
+  minio:
     image: minio/minio:latest
     ports:
       - 9000:9000 # API port
       - 9001:9001 # Console port
     environment:
       - MINIO_DOMAIN=
-      - MINIO_ROOT_USER=testaccess
-      - MINIO_ROOT_PASSWORD=testsecret
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
     volumes:
       - minio-test-data:/data
-    command: server --console-address ":9001" /data
+    command: server --console-address ":9001" /data --compat
     networks:
       - test_network
 

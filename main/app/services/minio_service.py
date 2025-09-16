@@ -1,5 +1,4 @@
 import logging
-
 from minio import Minio
 from app.core.config import settings
 
@@ -9,13 +8,20 @@ logger = logging.getLogger(__name__)
 def get_minio_client() -> Minio:
     """
     Get a MinIO client instance.
+    Force path-style access so bucket works with Docker service names
     """
     logger.info("Creating MinIO client instance.")
+
+    endpoint = settings.minio_endpoint.replace("http://", "").replace(
+        "https://", ""
+    )
+
     return Minio(
-        settings.minio_endpoint,
+        endpoint,
         access_key=settings.minio_access_key,
         secret_key=settings.minio_secret_key,
-        secure=False,  # Set to True if using HTTPS
+        secure=settings.minio_endpoint.startswith("https"),
+        region="us-east-1",  # default agar tidak invalid request
     )
 
 

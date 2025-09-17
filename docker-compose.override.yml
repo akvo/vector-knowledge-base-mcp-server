@@ -1,0 +1,37 @@
+services:
+  main:
+    volumes:
+      - ./main:/app
+    environment:
+      - APP_ENV=dev
+    ports: !override
+      - "${APP_PORT}:8000"
+
+  chromadb:
+    ports: !override
+      - 8101:8000
+
+  minio:
+    ports: !override
+      - 9100:9000 # API port
+      - 9101:9001 # Console port
+
+  pgadmin:
+    image: dpage/pgadmin4:5.4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=dev@akvo.org
+      - PGADMIN_DEFAULT_PASSWORD=password
+    volumes:
+      - ./pgadmin4/servers.json:/pgadmin4/servers.json
+      - pg-admin-data:/var/lib/pgadmin
+    depends_on:
+      - db
+    ports:
+      - 5550:80
+    networks:
+      - app_network
+
+
+volumes:
+  pg-admin-data:
+

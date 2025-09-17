@@ -210,7 +210,7 @@ def patch_external_services(monkeypatch, tmp_path):
 
     # Async retriever for kb_query_service
     mock_retriever = AsyncMock()
-    mock_retriever.aget_relevant_documents.return_value = [
+    mock_retriever.ainvoke.return_value = [
         type(
             "Doc", (), {"page_content": "mock content", "metadata": {"id": 1}}
         )()

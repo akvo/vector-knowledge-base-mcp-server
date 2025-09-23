@@ -89,8 +89,8 @@ cp .env.example .env
 Fill in the variables according to your environment:
 
 ```env
-APP_ENV=prod/dev
-APP_PORT=8000/8100
+APP_ENV=dev
+APP_PORT=8100
 
 DATABASE_URL=postgresql://akvo:password@db:5432/kb_mcp
 
@@ -103,6 +103,7 @@ MINIO_BUCKET_NAME=documents
 # Chroma DB settings
 CHROMA_DB_HOST=chromadb
 CHROMA_DB_PORT=8000
+VECTOR_STORE_BATCH_SIZE=100
 
 # OpenAI settings
 OPENAI_API_KEY=your-openai-api-key-here
@@ -111,6 +112,11 @@ OPENAI_MODEL=gpt-4
 OPENAI_EMBEDDINGS_MODEL=text-embedding-ada-002
 
 ```
+
+**Notes**
+- `APP_ENV` accepts two values: `prod` or `dev`.
+- This variable controls the startup command in `entrypoint.sh`, determining whether the application runs in reload mode (`dev`) or in production mode (`prod`).
+- `VECTOR_STORE_BATCH_SIZE` controls how many documents are processed in a single batch when adding to the vector store. There is a trade off between performance and hitting limits on the number of chunks that can be stored at once default is 100 but you can tune this setting here
 
 ### Development Setup
 

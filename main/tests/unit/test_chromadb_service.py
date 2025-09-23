@@ -4,13 +4,19 @@ from langchain_core.documents import Document
 
 @pytest.mark.usefixtures("patch_external_services")
 class TestChromaVectorStore:
-    def test_add_documents(self, patch_external_services):
+    def test_add_documents(self, patch_external_services, mocker):
         vector_store = patch_external_services["mock_vector_store"]
-        doc = Document(
-            page_content="Hello world", metadata={"title": "greeting"}
+
+        doc1 = Document(page_content="hello world", metadata={"id": 1})
+        doc2 = Document(page_content="foo bar", metadata={"id": 2})
+
+        # Force batching to size 1 so we can test the loop
+        mocker.patch(
+            "app.services.chromadb_service.settings.vector_store_batch_size", 1
         )
-        vector_store.add_documents([doc])
-        vector_store.add_documents.assert_called_once_with([doc])
+
+        vector_store.add_documents([doc1, doc2])
+        vector_store.add_documents.assert_called_once_with([doc1, doc2])
 
     def test_add_embeddings(self, patch_external_services):
         vector_store = patch_external_services["mock_vector_store"]

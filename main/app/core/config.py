@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     chroma_db_host: str = "localhost"
     chroma_db_port: int = 8000
 
+    # Vector Store batch processing
+    vector_store_batch_size: int = 100
+
     # OpenAI settings
     openai_api_key: str = "your-openai-api-key-here"
     openai_api_base: str = "https://api.openai.com/v1"

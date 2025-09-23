@@ -46,6 +46,10 @@ class TestConfigSettings:
             config.settings.openai_embeddings_model
             == config.settings.openai_embeddings_model
         )
+        assert (
+            config.settings.vector_store_batch_size
+            == config.settings.vector_store_batch_size
+        )
         assert config.settings.admin_api_key == config.settings.admin_api_key
 
     def test_testing_true(self, monkeypatch):
@@ -110,5 +114,9 @@ class TestConfigSettings:
         assert (
             config.settings.openai_embeddings_model
             == config.settings.openai_embeddings_model
+        )
+        assert (
+            config.settings.vector_store_batch_size
+            == config.settings.vector_store_batch_size
         )
         assert config.settings.admin_api_key == config.settings.admin_api_key

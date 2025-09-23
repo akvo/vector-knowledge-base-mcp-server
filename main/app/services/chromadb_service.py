@@ -1,3 +1,4 @@
+import logging
 import chromadb
 
 from typing import List, Any, Optional
@@ -5,6 +6,8 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_chroma import Chroma
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 # TODO :: Implement batch size on add documents function
@@ -31,7 +34,27 @@ class ChromaVectorStore:
         )
 
     def add_documents(self, documents: List[Document]) -> None:
-        self._store.add_documents(documents)
+        """Add documents to Chroma in batches to avoid payload size limits"""
+        if not documents:
+            return
+
+        batch_size = settings.vector_store_batch_size
+        total_documents = len(documents)
+
+        info = f"Adding {total_documents} documents"
+        logger.info(f"{info} to vector store in batches of {batch_size}")
+
+        for i in range(0, total_documents, batch_size):
+            batch = documents[i : i + batch_size]  # noqa
+            batch_num = (i // batch_size) + 1
+            total_batches = (total_documents + batch_size - 1) // batch_size
+
+            info = f"Adding batch {batch_num}/{total_batches}"
+            logger.info(f"{info} ({len(batch)} documents)")
+            self._store.add_documents(batch)
+
+        info = f"Successfully added all {total_documents}"
+        logger.info(f"{info} documents to vector store")
 
     def add_embeddings(
         self,

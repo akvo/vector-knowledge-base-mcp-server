@@ -8,15 +8,23 @@ from app.services.chromadb_service import ChromaVectorStore
 
 @pytest.mark.unit
 class TestChromaVectorStore:
-    def test_add_documents(self, mock_chroma):
+    def test_add_documents(self, mock_chroma, mocker):
         store = ChromaVectorStore("test_collection")
-        doc = Document(page_content="hello world", metadata={"id": 1})
 
-        store.add_documents([doc])
+        doc1 = Document(page_content="hello world", metadata={"id": 1})
+        doc2 = Document(page_content="foo bar", metadata={"id": 2})
 
-        mock_chroma["mock_instance"].add_documents.assert_called_once_with(
-            [doc]
+        # Force batching to size 1 so we can test the loop
+        mocker.patch(
+            "app.services.chromadb_service.settings.vector_store_batch_size", 1
         )
+
+        store.add_documents([doc1, doc2])
+
+        # Called once per batch (2 docs -> 2 batches)
+        assert mock_chroma["mock_instance"].add_documents.call_count == 2
+        mock_chroma["mock_instance"].add_documents.assert_any_call([doc1])
+        mock_chroma["mock_instance"].add_documents.assert_any_call([doc2])
 
     def test_add_embeddings(self, mock_chroma):
         store = ChromaVectorStore("test_collection")

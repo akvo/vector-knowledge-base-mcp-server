@@ -89,8 +89,8 @@ cp .env.example .env
 Fill in the variables according to your environment:
 
 ```env
-APP_ENV=prod/dev
-APP_PORT=8000/8100
+APP_ENV=dev
+APP_PORT=8100
 
 DATABASE_URL=postgresql://akvo:password@db:5432/kb_mcp
 
@@ -111,6 +111,10 @@ OPENAI_MODEL=gpt-4
 OPENAI_EMBEDDINGS_MODEL=text-embedding-ada-002
 
 ```
+
+**Notes**
+- `APP_ENV` accepts two values: `prod` or `dev`.
+- This variable controls the startup command in `entrypoint.sh`, determining whether the application runs in reload mode (`dev`) or in production mode (`prod`).
 
 ### Development Setup
 

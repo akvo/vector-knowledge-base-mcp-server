@@ -1,0 +1,38 @@
+services:
+  main:
+    build:
+      context: ./main
+    depends_on:
+      - db
+    env_file:
+      - .env.test
+    environment:
+      - APP_ENV=dev
+    ports:
+      - 8100:8000
+    volumes:
+      - ./main:/app:delegated
+    restart: unless-stopped
+    networks:
+      - test_network
+
+  db:
+    image: postgres:12-alpine
+    environment:
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - ./db/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+      - pg-test-data:/var/lib/postgresql/data
+      - ./db/script:/script:ro
+    ports:
+      - 5432:5432
+    networks:
+      - test_network
+
+
+volumes:
+  pg-test-data:
+
+networks:
+  test_network:
+    driver: bridge

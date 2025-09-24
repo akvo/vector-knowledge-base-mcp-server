@@ -15,9 +15,12 @@ A high-performance FastAPI/FastMCP-based Model Context Protocol (MCP) server tha
   - [🛠️ Tech Stack](#️-tech-stack)
   - [📋 Prerequisites](#-prerequisites)
   - [🚀 Quick Start](#-quick-start)
+    - [Environment Variables](#environment-variables)
     - [Development Setup](#development-setup)
     - [Production Setup](#production-setup)
-    - [Service Ports](#service-ports)
+    - [Service Ports (dev)](#service-ports-dev)
+  - [🔑 Authentication](#-authentication)
+  - [📖 API Documentation](#-api-documentation)
   - [📁 Project Structure](#-project-structure)
   - [🚨 Troubleshooting](#-troubleshooting)
     - [Health Checks](#health-checks)
@@ -75,6 +78,46 @@ A high-performance FastAPI/FastMCP-based Model Context Protocol (MCP) server tha
 
 ## 🚀 Quick Start
 
+### Environment Variables
+
+Before running the application, create a `.env` file based on `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Fill in the variables according to your environment:
+
+```env
+APP_ENV=dev
+APP_PORT=8100
+
+DATABASE_URL=postgresql://akvo:password@db:5432/kb_mcp
+
+# MinIO settings
+MINIO_ENDPOINT=minio:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET_NAME=documents
+
+# Chroma DB settings
+CHROMA_DB_HOST=chromadb
+CHROMA_DB_PORT=8000
+VECTOR_STORE_BATCH_SIZE=100
+
+# OpenAI settings
+OPENAI_API_KEY=your-openai-api-key-here
+OPENAI_API_BASE=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4
+OPENAI_EMBEDDINGS_MODEL=text-embedding-ada-002
+
+```
+
+**Notes**
+- `APP_ENV` accepts two values: `prod` or `dev`.
+- This variable controls the startup command in `entrypoint.sh`, determining whether the application runs in reload mode (`dev`) or in production mode (`prod`).
+- `VECTOR_STORE_BATCH_SIZE` controls how many documents are processed in a single batch when adding to the vector store. There is a trade off between performance and hitting limits on the number of chunks that can be stored at once default is 100 but you can tune this setting here
+
 ### Development Setup
 
 1. **Clone the repository**
@@ -111,7 +154,7 @@ A high-performance FastAPI/FastMCP-based Model Context Protocol (MCP) server tha
    docker compose -f docker-compose.yml up -d
    ```
 
-### Service Ports
+### Service Ports (dev)
 
 | Service | Development | Production | Description |
 |---------|-------------|------------|-------------|
@@ -122,9 +165,39 @@ A high-performance FastAPI/FastMCP-based Model Context Protocol (MCP) server tha
 | MinIO Console | 9101 | 9001 | MinIO web interface |
 | PgAdmin | 5550 | - | Database admin (dev only) |
 
+## 🔑 Authentication
+
+All protected routes require an API Key.
+
+Requests must include the API key in the `Authorization` header:
+
+```http
+Authorization: API-Key <your_api_key>
+```
+
+Example:
+```bash
+curl -X GET http://localhost:8100/api/v1/knowledge-base \
+  -H "Authorization: API-Key sk_test_xxxxxxx"
+```
+👉 See SECURITY.md
+
+
+## 📖 API Documentation
+
+Once the application is running `(uvicorn app.main:app --reload` or via Docker), the API documentation is automatically available through **FastAPI docs**:
+- Swagger UI → http://localhost:8000/api/docs or http://localhost:8100/api/docs
+- ReDoc → http://localhost:8000/redoc or http://localhost:8100/redoc
+
+From these interfaces, you can:
+- Try out endpoints directly
+- View request and response schemas
+- Test the API interactively
+
+
 ## 📁 Project Structure
 
-```
+```bash
 vector-knowledge-base-mcp-server/
 ├── main/                          # FastAPI application
 │   ├── app/
@@ -132,6 +205,7 @@ vector-knowledge-base-mcp-server/
 │   │   ├── core/                  # Core configuration (settings, logging, security)
 │   │   ├── mcp/                   # MCP related files (FastMCP server, tools)
 │   │   ├── models/                # Pydantic models / ORM models
+│   │   ├── schemas/               # API schemas (Pydantic / base)
 │   │   ├── services/              # Business logic / service layer
 │   │   ├── utils/                 # Helpers / utilities
 │   ├── tests/                     # Unit / integration tests
@@ -146,8 +220,8 @@ vector-knowledge-base-mcp-server/
 ├── docker-compose.override.yml    # Override dev
 ├── .env.example                   # Env vars
 └── README.md
-
 ```
+
 
 ## 🚨 Troubleshooting
 

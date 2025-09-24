@@ -1,7 +1,7 @@
 services:
   main:
     volumes:
-      - ./main:/app
+      - ./main:/app:delegated
     environment:
       - APP_ENV=dev
     ports: !override

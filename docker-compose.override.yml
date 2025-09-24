@@ -17,7 +17,7 @@ services:
       - 9101:9001 # Console port
 
   pgadmin:
-    image: dpage/pgadmin4:5.4
+    image: dpage/pgadmin4:9.7.0
     environment:
       - PGADMIN_DEFAULT_EMAIL=dev@akvo.org
       - PGADMIN_DEFAULT_PASSWORD=password

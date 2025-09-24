@@ -1,14 +1,12 @@
 import pytest
 import json
 
-from fastmcp import Client
-from app.mcp.mcp_main import mcp
-
 
 @pytest.mark.asyncio
-async def test_sample_resource():
-    async with Client(mcp) as client:
-        resources = await client.list_resources()
+@pytest.mark.mcp
+class TestMCPResourceListSample:
+    async def test_sample_resource(self, mcp_client):
+        resources = await mcp_client.list_resources()
 
         target = next(
             (r for r in resources if str(r.uri) == "resource:/list/sample"),
@@ -16,7 +14,7 @@ async def test_sample_resource():
         )
         assert target is not None
 
-        content = await client.read_resource(target.uri)
+        content = await mcp_client.read_resource(target.uri)
         res = json.loads(content[0].text)
 
         assert res["uri"] == "resource://fake/example"

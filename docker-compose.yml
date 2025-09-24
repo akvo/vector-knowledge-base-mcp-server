@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:12-alpine
+    image: postgres:17-alpine
     environment:
       - POSTGRES_PASSWORD=password
     volumes:
@@ -32,7 +32,7 @@ services:
       - app_network
 
   chromadb:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:1.1.0
     ports:
       - 8001:8000
     volumes:
@@ -41,7 +41,7 @@ services:
       - app_network
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     ports:
       - 9000:9000 # API port
       - 9001:9001 # Console port
@@ -51,6 +51,20 @@ services:
     volumes:
       - minio_data:/data
     command: server --console-address ":9001" /data
+    networks:
+      - app_network
+
+  script:
+    build:
+      context: ./script
+    depends_on:
+      - main
+    environment:
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+    volumes:
+      - ./script:/app
+    tty: true
+    command: ["tail", "-f", "/dev/null"]
     networks:
       - app_network
 

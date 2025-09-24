@@ -4,6 +4,7 @@ services:
       context: ./main
     depends_on:
       - db
+      - minio
     env_file:
       - .env.test
     environment:
@@ -17,7 +18,7 @@ services:
       - test_network
 
   db:
-    image: postgres:12-alpine
+    image: postgres:17-alpine
     environment:
       - POSTGRES_PASSWORD=password
     volumes:
@@ -29,9 +30,25 @@ services:
     networks:
       - test_network
 
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    ports:
+      - 9000:9000 # API port
+      - 9001:9001 # Console port
+    environment:
+      - MINIO_DOMAIN=
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio-test-data:/data
+    command: server --console-address ":9001" /data --compat
+    networks:
+      - test_network
+
 
 volumes:
   pg-test-data:
+  minio-test-data:
 
 networks:
   test_network:

@@ -12,7 +12,7 @@ from fastapi import (
     BackgroundTasks,
     Query,
 )
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, joinedload
 from minio.error import MinioException
 
 from app.core.config import settings
@@ -96,16 +96,13 @@ def get_knowledge_base(
     api_key: APIKey = Depends(get_api_key),
 ) -> Any:
     """
-    Get knowledge base by ID.
+    Get knowledge base by ID with list of documents.
+    Does not prefetch all document tasks to avoid blocking.
     """
-    from sqlalchemy.orm import joinedload
-
     kb = (
         db.query(KnowledgeBase)
         .options(
-            joinedload(KnowledgeBase.documents).joinedload(
-                Document.processing_tasks
-            )
+            joinedload(KnowledgeBase.documents)  # only documents, no tasks
         )
         .filter(KnowledgeBase.id == kb_id)
         .first()

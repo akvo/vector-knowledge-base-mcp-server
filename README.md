@@ -111,12 +111,16 @@ OPENAI_API_BASE=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4
 OPENAI_EMBEDDINGS_MODEL=text-embedding-ada-002
 
+# Admin Auth
+ADMIN_API_KEY=your-admin-api-key-here
 ```
 
 **Notes**
 - `APP_ENV` accepts two values: `prod` or `dev`.
 - This variable controls the startup command in `entrypoint.sh`, determining whether the application runs in reload mode (`dev`) or in production mode (`prod`).
-- `VECTOR_STORE_BATCH_SIZE` controls how many documents are processed in a single batch when adding to the vector store. There is a trade off between performance and hitting limits on the number of chunks that can be stored at once default is 100 but you can tune this setting here
+- `VECTOR_STORE_BATCH_SIZE` controls how many documents are processed in a single batch when adding to the vector store. There is a trade off between performance and hitting limits on the number of chunks that can be stored at once default is 100 but you can tune this setting here.
+- `ADMIN_API_KEY` currently used for authentication to access the CRUD API keys endpoint. With this, the script can create an API key that will be used as the authentication token to access the CRUD Knowledge Base.
+  - 👉 [How to generate `ADMIN_API_KEY`](./GENERATE_ADMIN_API_KEY.md)
 
 ### Development Setup
 
@@ -143,8 +147,27 @@ OPENAI_EMBEDDINGS_MODEL=text-embedding-ada-002
    ```
 
 5. **Running pytest**
+   - Running FastAPI endpoint test
+
    ```bash
-   ./dev.sh exec main ./test.sh
+   ./dev.sh exec main ./test.sh api
+   ```
+
+   - Running e2e test
+
+   ```bash
+   ./dev.sh exec main ./test.sh e2e
+   ```
+   - Running FastMCP test
+
+   ```bash
+   ./dev.sh exec main ./test.sh mcp
+   ```
+
+   - Running All test
+
+   ```bash
+   ./dev.sh exec main ./test.sh all
    ```
 
 ### Production Setup

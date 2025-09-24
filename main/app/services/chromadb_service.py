@@ -10,6 +10,8 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+# TODO :: Implement batch size on add documents function
+# take a look into Akvo RAG chroma.py
 class ChromaVectorStore:
     def __init__(
         self,
@@ -21,6 +23,9 @@ class ChromaVectorStore:
             host=settings.chroma_db_host,
             port=settings.chroma_db_port,
         )
+
+        if settings.testing:
+            collection_name = f"{collection_name}_test"
 
         self._store = Chroma(
             client=self._chroma_client,

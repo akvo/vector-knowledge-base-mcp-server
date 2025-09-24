@@ -34,7 +34,7 @@ class TestCleanupTempFilesRoute:
         patch_kb_route_services,
     ):
         """Expired uploads should be deleted from DB and MinIO"""
-        mock_minio, _, _ = patch_kb_route_services
+        mock_minio, _, _, _ = patch_kb_route_services
 
         kb = KnowledgeBase(name="KB Cleanup", description="desc")
         session.add(kb)
@@ -107,7 +107,7 @@ class TestCleanupTempFilesRoute:
         Expired uploads should still be removed from DB even if MinIO deletion
         fails
         """
-        mock_minio, _, _ = patch_kb_route_services
+        mock_minio, _, _, _ = patch_kb_route_services
 
         kb = KnowledgeBase(name="KB Cleanup2", description="desc")
         session.add(kb)

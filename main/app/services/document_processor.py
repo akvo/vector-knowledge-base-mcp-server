@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from minio.error import MinioException
 from minio.commonconfig import CopySource
 
-from app.db.connection import SessionLocal
+from app.db.connection import get_session
 from app.core.config import settings
 from app.services.minio_service import get_minio_client
 from app.models.knowledge import ProcessingTask, Document, DocumentChunk
@@ -291,7 +291,7 @@ async def process_document_background(
 
     # if we don't pass in db, create a new database session
     if db is None:
-        db = SessionLocal()
+        db = next(get_session())
         should_close_db = True
     else:
         should_close_db = False

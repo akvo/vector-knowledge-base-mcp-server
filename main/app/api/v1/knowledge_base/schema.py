@@ -56,7 +56,7 @@ class DocumentResponse(DocumentBase):
     knowledge_base_id: int
     created_at: datetime
     updated_at: datetime
-    processing_tasks: List[ProcessingTask] = []
+    processing_tasks: Optional[List[ProcessingTask]] = None
 
     class Config:
         from_attributes = True

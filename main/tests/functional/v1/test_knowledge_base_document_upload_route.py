@@ -177,7 +177,7 @@ class TestUploadKBDocuments:
             ("files", ("err.txt", io.BytesIO(file_content), "text/plain")),
         ]
 
-        mock_minio, _, _ = patch_kb_route_services
+        mock_minio, _, _, _ = patch_kb_route_services
         mock_minio.put_object.side_effect = MinioException(
             code="500",
             message="MinIO down",

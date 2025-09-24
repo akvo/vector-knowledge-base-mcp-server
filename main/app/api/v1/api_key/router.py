@@ -5,6 +5,7 @@ import logging
 
 from app.db.connection import get_session
 from app.services.api_key_service import APIKeyService
+from app.core.security import verify_admin_key
 from . import schema
 
 router = APIRouter()
@@ -16,6 +17,7 @@ def read_api_keys(
     db: Session = Depends(get_session),
     skip: int = 0,
     limit: int = 100,
+    is_admin: bool = Depends(verify_admin_key),
 ) -> Any:
     """
     Retrieve API keys.
@@ -29,6 +31,7 @@ def create_api_key(
     *,
     db: Session = Depends(get_session),
     api_key_in: schema.APIKeyCreate,
+    is_admin: bool = Depends(verify_admin_key),
 ) -> Any:
     """
     Create new API key.
@@ -44,6 +47,7 @@ def update_api_key(
     db: Session = Depends(get_session),
     id: int,
     api_key_in: schema.APIKeyUpdate,
+    is_admin: bool = Depends(verify_admin_key),
 ) -> Any:
     """
     Update API key.
@@ -64,6 +68,7 @@ def delete_api_key(
     *,
     db: Session = Depends(get_session),
     id: int,
+    is_admin: bool = Depends(verify_admin_key),
 ) -> Any:
     """
     Delete API key.

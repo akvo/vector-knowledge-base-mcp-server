@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4"
     openai_embeddings_model: str = "text-embedding-ada-002"
 
+    # Admin API Key
+    admin_api_key: str = "your-admin-api-key-here"
+
     @field_validator("database_url", mode="before")
     def escape_percent(cls, v: str) -> str:
         return v.replace("%", "%%") if v else v

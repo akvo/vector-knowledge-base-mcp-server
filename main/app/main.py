@@ -42,4 +42,4 @@ app = FastAPI(
 app.include_router(api_router, prefix="/api")
 
 # Mount the MCP server
-app.mount("/", mcp_app)
+app.mount("/mcp", mcp_app)

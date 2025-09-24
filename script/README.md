@@ -30,6 +30,10 @@ Before running the script, set `ADMIN_API_KEY` credentials in your shell or envi
 export ADMIN_API_KEY="your-admin-api-key-here"
 ```
 
+The `ADMIN_API_KEY` is currently used for authentication to access the CRUD API keys endpoint. With this, the script can create an API key that will be used as the authentication token to access the CRUD Knowledge Base.
+
+👉 [How to generate `ADMIN_API_KEY`](../GENERATE_ADMIN_API_KEY.md)
+
 ## 🚀 Running the Script
 
 To execute the script:

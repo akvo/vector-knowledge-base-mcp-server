@@ -6,6 +6,12 @@ class Settings(BaseSettings):
     testing: bool = False
     database_url: str
 
+    # PRIVATE MCP CONFIG
+    mcp_server_name: str = "Vector Knowledge Base MCP Server"
+    mcp_server_description: str = (
+        "A secure MCP server that provides access to vector-based knowledge bases. It exposes tools and resources for querying, retrieving, and managing knowledge base documents using similarity search. This server allows LLM-powered agents to discover relevant context across multiple knowledge bases and return grounded responses with supporting evidence."  # noqa
+    )
+
     # MinIO settings
     minio_endpoint: str = "localhost:9000"
     minio_access_key: str = "minioadmin"

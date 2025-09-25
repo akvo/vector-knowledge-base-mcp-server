@@ -4,12 +4,17 @@ from app.services.kb_query_service import query_vector_kbs
 from app.mcp.secure_mcp import SecureFastMCP
 from app.mcp.mcp_auth import APIKeyAuthProvider
 from app.mcp.resources.kb_resources import load_kb_resources
+from app.mcp.resources.static_resources import get_server_info
+from app.core.config import settings
 
 # User SecureFastMCP + APIKeyAuthProvider
 mcp = SecureFastMCP(
-    name="Vector Knowledge Base MCP Server",
+    name=settings.mcp_server_name,
     auth=APIKeyAuthProvider(),
 )
+
+# Static Resources
+get_server_info(mcp=mcp)
 
 # Load Dynamic MCP Resources
 load_kb_resources(mcp=mcp)

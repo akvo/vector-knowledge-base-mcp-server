@@ -9,6 +9,8 @@ class TestMCPKnowledgeBaseResourceLis:
 
         assert len(resources) > 0
         for r in resources:
-            assert "Testing KB" in r.name
-            assert "KB Description" in r.description
-            assert "resource://knowledge_base/" in str(r.uri)
+            uri = str(r.uri)
+            if "resource://knowledge_base/" in uri:
+                assert "Testing KB" in r.name
+                assert "KB Description" in r.description
+                assert "resource://knowledge_base/" in str(r.uri)

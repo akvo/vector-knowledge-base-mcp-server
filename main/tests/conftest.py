@@ -217,6 +217,18 @@ def patch_external_services(monkeypatch, tmp_path):
     ]
     mock_vs.as_retriever.return_value = mock_retriever
 
+    # Mock similarity search with score instead of retriever
+    mock_vs.similarity_search_with_score.return_value = [
+        (
+            type(
+                "Doc",
+                (),
+                {"page_content": "mock content", "metadata": {"id": 1}},
+            )(),
+            0.1,  # fake score
+        )
+    ]
+
     # ---------- Preview document ----------
     mock_preview = AsyncMock()
     mock_preview.return_value = document_processor.PreviewResult(

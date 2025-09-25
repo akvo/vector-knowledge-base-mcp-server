@@ -3,7 +3,7 @@ from app.services.kb_query_service import query_vector_kbs
 
 from app.mcp.secure_mcp import SecureFastMCP
 from app.mcp.mcp_auth import APIKeyAuthProvider
-
+from app.mcp.resources.kb_resources import load_kb_resources
 
 # User SecureFastMCP + APIKeyAuthProvider
 mcp = SecureFastMCP(
@@ -11,24 +11,8 @@ mcp = SecureFastMCP(
     auth=APIKeyAuthProvider(),
 )
 
-
-@mcp.resource(
-    uri="resource:/list/sample",
-    name="Sample Resource",
-    description="A sample static resource",
-    mime_type="application/json",
-)
-def sample_resource() -> dict:
-    """
-    Fake resource
-    """
-    return {
-        "uri": "resource://fake/example",
-        "name": "Fake Resource",
-        "description": "This is a fake static resource",
-        "mimeType": "application/json",
-        "metadata": {"foo": "bar"},
-    }
+# Load Dynamic MCP Resources
+load_kb_resources(mcp=mcp)
 
 
 @mcp.tool(name="greeting", description="Greet a person with their name.")

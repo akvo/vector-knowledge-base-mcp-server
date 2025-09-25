@@ -333,6 +333,8 @@ def run_test_server(patch_mcp_server_vector_store):
     import requests
     from app.main import app as main_app
 
+    os.environ["TESTING"] = "1"
+
     check_test_db_url()
 
     engine = create_engine(get_db_url())
@@ -354,7 +356,7 @@ def run_test_server(patch_mcp_server_vector_store):
     process.start()
 
     # Wait server ready
-    for _ in range(10):
+    for _ in range(15):
         try:
             r = requests.get("http://127.0.0.1:8001/api/health")
             if r.status_code == 200:

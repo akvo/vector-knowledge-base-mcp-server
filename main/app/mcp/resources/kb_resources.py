@@ -36,9 +36,10 @@ def load_kb_resources(mcp):
             logger.info("ℹ️ No Knowledge Bases found to load.")
             return
 
+        base_uri = "resource://knowledge_base"
         for kb in kb_list:
             resource = TextResource(
-                uri=f"resource://knowledge_base/{kb.id}",
+                uri=f"{base_uri}/{kb.id}",
                 name=kb.name,
                 text="",
                 description=kb.description or "",

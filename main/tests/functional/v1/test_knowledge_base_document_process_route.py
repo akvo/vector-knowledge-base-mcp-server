@@ -28,7 +28,7 @@ class TestProcessDocumentsRoute:
         assert res.status_code == 401
         assert res.json()["detail"] == "API key required"
 
-    @patch("app.api.v1.knowledge_base.router.add_processing_tasks_to_queue")
+    @patch("app.services.document_service.DocumentService._enqueue_processing")
     async def test_process_documents_success(
         self,
         mock_add_queue,
@@ -74,7 +74,7 @@ class TestProcessDocumentsRoute:
         # background task must be queued
         assert mock_add_queue.called
 
-    @patch("app.api.v1.knowledge_base.router.add_processing_tasks_to_queue")
+    @patch("app.services.document_service.DocumentService._enqueue_processing")
     async def test_process_documents_skip_processing(
         self,
         mock_add_queue,

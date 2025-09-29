@@ -31,10 +31,10 @@ class TestCleanupTempFilesRoute:
         session: Session,
         client: AsyncClient,
         api_key_value: str,
-        patch_kb_route_services,
+        patch_external_services,
     ):
         """Expired uploads should be deleted from DB and MinIO"""
-        mock_minio, _, _, _ = patch_kb_route_services
+        mock_minio = patch_external_services["mock_minio"]
 
         kb = KnowledgeBase(name="KB Cleanup", description="desc")
         session.add(kb)
@@ -78,7 +78,7 @@ class TestCleanupTempFilesRoute:
 
         assert response.status_code == 200
         data = response.json()
-        assert "Cleaned up" in data["message"]
+        assert "Cleaned" in data["message"]
 
         # expired deleted
         assert (
@@ -92,7 +92,7 @@ class TestCleanupTempFilesRoute:
         )
         # MinIO deletion called
         mock_minio.remove_object.assert_called_once_with(
-            bucket_name=settings.minio_bucket_name, object_name="tmp/old.txt"
+            settings.minio_bucket_name, "tmp/old.txt"
         )
 
     async def test_cleanup_temp_files_minio_failure(
@@ -101,13 +101,13 @@ class TestCleanupTempFilesRoute:
         session: Session,
         client: AsyncClient,
         api_key_value: str,
-        patch_kb_route_services,
+        patch_external_services,
     ):
         """
         Expired uploads should still be removed from DB even if MinIO deletion
         fails
         """
-        mock_minio, _, _, _ = patch_kb_route_services
+        mock_minio = patch_external_services["mock_minio"]
 
         kb = KnowledgeBase(name="KB Cleanup2", description="desc")
         session.add(kb)
@@ -145,7 +145,7 @@ class TestCleanupTempFilesRoute:
 
         assert response.status_code == 200
         data = response.json()
-        assert "Cleaned up" in data["message"]
+        assert "Cleaned" in data["message"]
 
         # expired upload deleted from DB anyway
         assert (
@@ -154,5 +154,5 @@ class TestCleanupTempFilesRoute:
         )
         # minio deletion attempted
         mock_minio.remove_object.assert_called_once_with(
-            bucket_name=settings.minio_bucket_name, object_name="tmp/bad.txt"
+            settings.minio_bucket_name, "tmp/bad.txt"
         )

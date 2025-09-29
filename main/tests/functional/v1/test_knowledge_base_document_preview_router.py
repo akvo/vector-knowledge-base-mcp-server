@@ -1,6 +1,5 @@
 import pytest
 
-from unittest.mock import patch
 from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
@@ -36,14 +35,13 @@ class TestPreviewDocumentsRoute:
         assert res.status_code == 401
         assert res.json()["detail"] == "API key required"
 
-    @patch("app.api.v1.knowledge_base.router.preview_document")
     async def test_preview_with_document(
         self,
-        mock_preview,
         app: FastAPI,
         session: Session,
         client: AsyncClient,
         api_key_value: str,
+        patch_external_services,
     ):
         """Preview route should work with existing Document"""
         kb = KnowledgeBase(name="KB Test", description="desc")
@@ -62,10 +60,7 @@ class TestPreviewDocumentsRoute:
         session.commit()
 
         # mock preview result
-        mock_preview.return_value = {
-            "chunks": [{"content": "hello", "metadata": {"page": 1}}],
-            "total_chunks": 1,
-        }
+        _ = patch_external_services["mock_preview"]
 
         response = await client.post(
             app.url_path_for("v1_preview_kb_documents", kb_id=kb.id),
@@ -80,16 +75,15 @@ class TestPreviewDocumentsRoute:
         assert response.status_code == 200
         data = response.json()
         assert str(doc.id) in data
-        assert data[str(doc.id)]["total_chunks"] == 1
+        assert data[str(doc.id)]["total_chunks"] == 2
 
-    @patch("app.api.v1.knowledge_base.router.preview_document")
     async def test_preview_with_upload(
         self,
-        mock_preview,
         app: FastAPI,
         session: Session,
         client: AsyncClient,
         api_key_value,
+        patch_external_services,
     ):
         """Preview route should work with existing DocumentUpload"""
         kb = KnowledgeBase(name="KB Test2", description="desc")
@@ -108,10 +102,8 @@ class TestPreviewDocumentsRoute:
         session.add(upload)
         session.commit()
 
-        mock_preview.return_value = {
-            "chunks": [{"content": "preview text", "metadata": {"page": 1}}],
-            "total_chunks": 1,
-        }
+        # mock preview result
+        _ = patch_external_services["mock_preview"]
 
         response = await client.post(
             app.url_path_for("v1_preview_kb_documents", kb_id=kb.id),
@@ -126,7 +118,7 @@ class TestPreviewDocumentsRoute:
         assert response.status_code == 200
         data = response.json()
         assert str(upload.id) in data
-        assert data[str(upload.id)]["total_chunks"] == 1
+        assert data[str(upload.id)]["total_chunks"] == 2
 
     async def test_preview_not_found(
         self,
@@ -153,14 +145,13 @@ class TestPreviewDocumentsRoute:
         assert response.status_code == 404
         assert "not found" in response.text
 
-    @patch("app.api.v1.knowledge_base.router.preview_document")
     async def test_preview_multiple_documents_and_uploads(
         self,
-        mock_preview,
         app: FastAPI,
         session: Session,
         client: AsyncClient,
         api_key_value: str,
+        patch_external_services,
     ):
         """
         Preview route should handle mix of Document and DocumentUpload in one
@@ -195,6 +186,8 @@ class TestPreviewDocumentsRoute:
         session.add(upload)
         session.commit()
 
+        # mock preview result
+        mock_preview = patch_external_services["mock_preview"]
         # set mock to return different results depending on call order
         mock_preview.side_effect = [
             {
@@ -257,14 +250,13 @@ class TestPreviewDocumentsRoute:
         data = response.json()
         assert data == {}
 
-    @patch("app.api.v1.knowledge_base.router.preview_document")
     async def test_preview_duplicate_document_ids(
         self,
-        mock_preview,
         app: FastAPI,
         session: Session,
         client: AsyncClient,
         api_key_value: str,
+        patch_external_services,
     ):
         """Preview route should handle duplicate document_ids gracefully"""
         kb = KnowledgeBase(name="KB Test6", description="desc")
@@ -282,10 +274,8 @@ class TestPreviewDocumentsRoute:
         session.add(doc)
         session.commit()
 
-        mock_preview.return_value = {
-            "chunks": [{"content": "dup content", "metadata": {"page": 1}}],
-            "total_chunks": 1,
-        }
+        # mock preview result
+        mock_preview = patch_external_services["mock_preview"]
 
         response = await client.post(
             app.url_path_for("v1_preview_kb_documents", kb_id=kb.id),
@@ -304,18 +294,17 @@ class TestPreviewDocumentsRoute:
         assert list(data.keys()).count(str(doc.id)) == 1
 
         assert str(doc.id) in data
-        assert data[str(doc.id)]["total_chunks"] == 1
+        assert data[str(doc.id)]["total_chunks"] == 2
 
         assert mock_preview.call_count == 2
 
-    @patch("app.api.v1.knowledge_base.router.preview_document")
     async def test_preview_duplicate_mixed_document_and_upload_ids(
         self,
-        mock_preview,
         app: FastAPI,
         session: Session,
         client: AsyncClient,
         api_key_value: str,
+        patch_external_services,
     ):
         """
         Preview route should handle duplicate mix of Document and
@@ -348,12 +337,26 @@ class TestPreviewDocumentsRoute:
         session.add(upload)
         session.commit()
 
-        mock_preview.return_value = {
-            "chunks": [
-                {"content": "dup mix content", "metadata": {"page": 1}}
-            ],
-            "total_chunks": 1,
-        }
+        # mock preview result
+        mock_preview = patch_external_services["mock_preview"]
+        mock_preview.side_effect = [
+            {
+                "chunks": [{"content": "1 chunk", "metadata": {"page": 1}}],
+                "total_chunks": 1,
+            },
+            {
+                "chunks": [{"content": "2 chunk", "metadata": {"page": 1}}],
+                "total_chunks": 1,
+            },
+            {
+                "chunks": [{"content": "3 chunk", "metadata": {"page": 1}}],
+                "total_chunks": 1,
+            },
+            {
+                "chunks": [{"content": "4 chunk", "metadata": {"page": 1}}],
+                "total_chunks": 1,
+            },
+        ]
 
         response = await client.post(
             app.url_path_for("v1_preview_kb_documents", kb_id=kb.id),

@@ -44,10 +44,10 @@ class TestTestRetrievalRoute:
         session: Session,
         client: AsyncClient,
         api_key_value: str,
-        patch_kb_route_services,
+        patch_external_services,
     ):
         """Should return mocked search results"""
-        _, mock_vector_store, mock_embeddings, _ = patch_kb_route_services
+        mock_vector_store = patch_external_services["mock_vector_store"]
 
         kb = KnowledgeBase(name="KB Retrieval", description="desc")
         session.add(kb)
@@ -98,10 +98,10 @@ class TestTestRetrievalRoute:
         session: Session,
         client: AsyncClient,
         api_key_value: str,
-        patch_kb_route_services,
+        patch_external_services,
     ):
         """Should return 500 if vector store throws error"""
-        _, mock_vector_store, _, _ = patch_kb_route_services
+        mock_vector_store = patch_external_services["mock_vector_store"]
 
         kb = KnowledgeBase(name="KB Retrieval Fail", description="desc")
         session.add(kb)

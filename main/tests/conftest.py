@@ -271,57 +271,6 @@ def patch_external_services(monkeypatch, tmp_path):
     }
 
 
-# TODO:: DELETE # -------------------------------
-# # Mocks KB route service
-# # -------------------------------
-# @pytest.fixture
-# def patch_kb_route_services():
-#     """
-#     Patch external services in KB routes:
-#     - MinIO client
-#     - Chroma vector store
-#     - EmbeddingsFactory
-#     - preview_document
-#     """
-#     with patch(
-#         "app.api.v1.knowledge_base.router.get_minio_client"
-#     ) as mock_get_minio_client, patch(
-#         "app.api.v1.knowledge_base.router.ChromaVectorStore"
-#     ) as mock_chroma_cls, patch(
-#         "app.api.v1.knowledge_base.router.EmbeddingsFactory.create"
-#     ) as mock_embeddings_create, patch(
-#         "app.api.v1.knowledge_base.router.preview_document"
-#     ) as mock_preview_doc:
-
-#         # Create mock instances
-#         mock_minio_client = MagicMock()
-#         mock_vector_store = MagicMock()
-#         mock_embeddings = MagicMock()
-
-#         # Stub MinIO client methods
-#         mock_minio_client.put_object.return_value = None
-#         mock_minio_client.list_objects.return_value = []
-#         mock_minio_client.remove_object.return_value = None
-
-#         # Assign mocks to patch targets
-#         mock_get_minio_client.return_value = mock_minio_client
-#         mock_chroma_cls.return_value = mock_vector_store
-#         mock_embeddings_create.return_value = mock_embeddings
-#         mock_preview_doc.return_value = {
-#             "chunks": [{"content": "dummy content", "metadata": {"page": 1}}],
-#             "total_chunks": 1,
-#         }
-
-#         # Yield all mocks for use in tests
-#         yield (
-#             mock_minio_client,
-#             mock_vector_store,
-#             mock_embeddings,
-#             mock_preview_doc,
-#         )
-# EOL DELETE
-
-
 # -------------------------------
 # Fixture to patch MCP server vector store
 # -------------------------------

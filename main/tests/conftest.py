@@ -12,7 +12,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from httpx import AsyncClient, ASGITransport
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

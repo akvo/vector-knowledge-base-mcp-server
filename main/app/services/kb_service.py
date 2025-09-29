@@ -1,7 +1,6 @@
 import logging
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from minio.error import MinioException
 
 from app.models.knowledge import KnowledgeBase
 from app.services.minio_service import get_minio_client
@@ -41,9 +40,13 @@ class KnowledgeBaseService:
                         settings.minio_bucket_name, obj.object_name
                     )
                 logger.info(f"Cleaned MinIO files for KB {kb_id}")
-            except MinioException as e:
-                cleanup_errors.append(f"MinIO cleanup failed: {str(e)}")
-                logger.error(f"MinIO cleanup error for KB {kb_id}: {str(e)}")
+            except Exception as e:  # 👈 catches non-MinIO exceptions
+                cleanup_errors.append(
+                    f"Unexpected MinIO cleanup error: {str(e)}"
+                )
+                logger.error(
+                    f"Unexpected MinIO error for KB {kb_id}: {str(e)}"
+                )
 
             # 2. Vector store cleanup
             try:

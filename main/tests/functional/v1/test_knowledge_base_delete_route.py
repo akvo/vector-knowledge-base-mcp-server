@@ -1,6 +1,5 @@
 import pytest
 
-from fastapi import status
 from minio.error import S3Error as MinioException
 
 from app.core.config import settings
@@ -53,7 +52,7 @@ class TestDeleteKnowledgeBase:
             headers=self.get_headers(api_key_value),
         )
 
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == 200
         assert response.json() == {
             "message": "KB and all associated resources deleted successfully"
         }
@@ -69,7 +68,7 @@ class TestDeleteKnowledgeBase:
             app.url_path_for("v1_delete_knowledge_base", kb_id=999999),
             headers=self.get_headers(api_key_value),
         )
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == 404
         assert response.json() == {"detail": "Knowledge base not found"}
 
     async def test_delete_minio_error(
@@ -100,9 +99,9 @@ class TestDeleteKnowledgeBase:
             headers=self.get_headers(api_key_value),
         )
 
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == 200
         assert "warnings" in response.json()
-        assert "MinIO cleanup failed" in response.json()["warnings"][0]
+        assert "MinIO cleanup error" in response.json()["warnings"][0]
         assert session.query(KnowledgeBase).filter_by(id=kb_id).first() is None
 
     async def test_delete_chroma_error(
@@ -129,7 +128,7 @@ class TestDeleteKnowledgeBase:
             headers=self.get_headers(api_key_value),
         )
 
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == 200
         assert "warnings" in response.json()
         assert (
             "Vector store cleanup failed: Chroma down"
@@ -160,13 +159,9 @@ class TestDeleteKnowledgeBase:
             headers=self.get_headers(api_key_value),
         )
 
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert response.json() == {
-            "detail": "Failed to delete knowledge base: Unexpected error"
-        }
-
-        # KB tetap terhapus dari DB
-        assert (
-            session.query(KnowledgeBase).filter_by(id=kb_id).first()
-            is not None
+        assert response.status_code == 200
+        assert "warnings" in response.json()
+        assert any(
+            "Unexpected error" in w for w in response.json()["warnings"]
         )
+        assert session.query(KnowledgeBase).filter_by(id=kb_id).first() is None

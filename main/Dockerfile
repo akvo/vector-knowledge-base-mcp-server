@@ -10,11 +10,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy source code
 COPY ./app ./app
-COPY /entrypoint.sh /entrypoint.sh
+COPY alembic.ini .
+COPY migrations ./migrations
+
+# Copy scripts
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-COPY /test.sh /test.sh
+COPY test.sh /test.sh
 RUN chmod +x /test.sh
 
 EXPOSE 8000

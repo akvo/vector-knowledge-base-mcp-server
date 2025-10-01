@@ -1,0 +1,50 @@
+name: Reusable Build & Test
+
+on:
+  workflow_call:
+    outputs:
+      test_result:
+        description: "The result of the test job (success or failure)"
+        value: ${{ jobs.test.outputs.test_result }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      ENV_FILE: .env.test
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Copy test env file
+        run: cp $ENV_FILE .env
+
+      - name: Start isolated test services
+        run: docker compose -f docker-compose.test.yml up -d --build
+
+      - name: Wait for MinIO
+        run: |
+          echo "Waiting for MinIO..."
+          until curl -s -f http://localhost:9000/minio/health/live >/dev/null 2>&1; do
+            sleep 2
+          done
+          echo "MinIO is ready."
+
+      - name: Run API tests
+        run: docker compose exec -T main bash /test.sh api
+
+      - name: Run MCP tests
+        run: docker compose exec -T main bash /test.sh mcp
+
+      - name: Run e2e tests
+        run: docker compose exec -T main bash /test.sh e2e
+
+      - name: Show logs if failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker-compose.test.yml down -v

@@ -1,0 +1,103 @@
+name: Deploy to Test Cluster
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy-to-test
+  cancel-in-progress: false
+
+jobs:
+  run-tests:
+    name: Run Tests
+    uses: ./.github/workflows/test-reusable.yml # Calls the reusable test workflow
+    secrets: inherit
+  build-push:
+    name: Build and Push to Registry
+    runs-on: ubuntu-latest
+    needs: run-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: src
+
+      - name: Checkout Akvo composite actions
+        uses: actions/checkout@v4
+        with:
+          repository: akvo/composite-actions
+          token: ${{ secrets.GH_PAT }}
+          path: composite-actions
+          ref: 0.0.10
+
+      - name: Docker Build Main App
+        uses: ./composite-actions/.github/actions/docker-build
+        with:
+          app-name: "kb-mcp-server"
+          service-name: "main"
+          dockerfile-location: "main/Dockerfile"
+          cluster-name: "test"
+
+      - name: Docker Build script
+        uses: ./composite-actions/.github/actions/docker-build
+        with:
+          app-name: "kb-mcp-server"
+          service-name: "script"
+          dockerfile-location: "script/Dockerfile"
+          cluster-name: "test"
+
+      - name: Docker Push Main App
+        uses: ./composite-actions/.github/actions/docker-push
+        with:
+          app-name: "kb-mcp-server"
+          service-name: "main"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
+          cluster-name: "test"
+
+      - name: Docker Push Script
+        uses: ./composite-actions/.github/actions/docker-push
+        with:
+          app-name: "kb-mcp-server"
+          service-name: "script"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
+          cluster-name: "test"
+
+  rollout:
+    name: Rollout to the server
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: src
+
+      - name: Checkout Akvo composite actions
+        uses: actions/checkout@v4
+        with:
+          repository: akvo/composite-actions
+          token: ${{ secrets.GH_PAT }}
+          path: composite-actions
+          ref: 0.0.10
+
+      - name: Rollout Main App
+        uses: ./composite-actions/.github/actions/k8s-rollout
+        with:
+          app-name: "kb-mcp-server"
+          deployment-name: "main-deployment"
+          container-name: "main"
+          cluster-name: "test"
+          namespace-name: "kb-mcp-server-namespace"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
+
+      - name: Rollout Script
+        uses: ./composite-actions/.github/actions/k8s-rollout
+        with:
+          app-name: "kb-mcp-server"
+          deployment-name: "script-deployment"
+          container-name: "script"
+          cluster-name: "test"
+          namespace-name: "kb-mcp-server-namespace"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}

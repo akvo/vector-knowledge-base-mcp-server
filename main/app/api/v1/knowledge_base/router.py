@@ -41,6 +41,8 @@ from app.services.document_processor import (
     PreviewResult,
     process_document_background,
 )
+from app.mcp.mcp_main import mcp
+from app.mcp.resources.kb_resources import load_kb_resources
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -63,6 +65,7 @@ def create_knowledge_base(
     db.commit()
     db.refresh(kb)
     logger.info(f"Knowledge base created: {kb.name}")
+    load_kb_resources(mcp=mcp)
     return kb
 
 

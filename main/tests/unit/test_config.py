@@ -51,6 +51,13 @@ class TestConfigSettings:
             == config.settings.vector_store_batch_size
         )
         assert config.settings.admin_api_key == config.settings.admin_api_key
+        assert (
+            config.settings.mcp_server_name == config.settings.mcp_server_name
+        )
+        assert (
+            config.settings.mcp_server_description
+            == config.settings.mcp_server_description
+        )
 
     def test_testing_true(self, monkeypatch):
         """If TESTING=true, settings.testing must be True."""

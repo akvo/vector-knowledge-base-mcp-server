@@ -24,10 +24,13 @@ class TestQueryVectorKbsIntegration:
         session.commit()
 
         res = await query_vector_kbs("hello", [kb.id], top_k=3)
+
         assert res["context"] is not None
         decoded = json.loads(base64.b64decode(res["context"]).decode())
         assert decoded["context"] == []
-        assert f"Knowledge base {kb.id} is empty." in res["note"]
+        assert (
+            "No relevant documents found across selected KBs." in res["note"]
+        )
 
     async def test_success_retrieval(
         self, session: Session, patch_external_services
@@ -79,6 +82,10 @@ class TestQueryVectorKbsIntegration:
 
         # Force retriever error
         mock_store.as_retriever.side_effect = Exception("Vector store failed")
+        # Force similarity search error
+        mock_store.similarity_search_with_score.side_effect = Exception(
+            "Vector store failed"
+        )
 
         res = await query_vector_kbs("hello", [kb.id], top_k=2)
 

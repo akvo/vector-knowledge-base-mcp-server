@@ -58,7 +58,10 @@ class TestQueryKnowledgeBaseFunctional:
 
         decoded = json.loads(base64.b64decode(result.data["context"]).decode())
         assert decoded["context"] == []
-        assert f"Knowledge base {kb.id} is empty." in result.data["note"]
+        assert (
+            "No relevant documents found across selected KBs."
+            in result.data["note"]
+        )
 
     async def test_query_not_found_kb_functional(self, mcp_client):
         result = await mcp_client.call_tool(

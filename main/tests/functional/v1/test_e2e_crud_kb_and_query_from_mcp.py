@@ -10,7 +10,7 @@ class TestKnowledgeBaseE2E:
         app,
         client,
         mcp_client,
-        patch_kb_route_services,
+        patch_external_services,
         api_key_value,
     ):
         """

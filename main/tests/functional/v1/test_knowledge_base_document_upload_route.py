@@ -33,7 +33,7 @@ class TestUploadKBDocuments:
         assert res.json()["detail"] == "API key required"
 
     async def test_upload_single_document(
-        self, client, app, session, api_key_value, patch_kb_route_services
+        self, client, app, session, api_key_value, patch_external_services
     ):
         # Arrange KB
         kb = KnowledgeBase(name="Single KB", description="KB for single doc")
@@ -68,7 +68,7 @@ class TestUploadKBDocuments:
         assert uploads[0].knowledge_base_id == kb_id
 
     async def test_upload_multiple_documents(
-        self, client, app, session, api_key_value, patch_kb_route_services
+        self, client, app, session, api_key_value, patch_external_services
     ):
         kb = KnowledgeBase(
             name="Multi KB", description="KB with multiple docs"
@@ -107,7 +107,7 @@ class TestUploadKBDocuments:
         assert len(uploads) == 2
 
     async def test_upload_duplicate_document(
-        self, client, app, session, api_key_value, patch_kb_route_services
+        self, client, app, session, api_key_value, patch_external_services
     ):
         kb = KnowledgeBase(name="Dup KB", description="KB with duplicate doc")
         session.add(kb)
@@ -149,7 +149,7 @@ class TestUploadKBDocuments:
         assert data[0]["file_name"] == "dup.txt"
 
     async def test_upload_kb_not_found(
-        self, client, app, api_key_value, patch_kb_route_services
+        self, client, app, api_key_value, patch_external_services
     ):
         files = [
             ("files", ("nofile.txt", io.BytesIO(b"abc"), "text/plain")),
@@ -165,7 +165,7 @@ class TestUploadKBDocuments:
         assert response.json() == {"detail": "Knowledge base not found"}
 
     async def test_upload_minio_error(
-        self, client, app, session, api_key_value, patch_kb_route_services
+        self, client, app, session, api_key_value, patch_external_services
     ):
         kb = KnowledgeBase(name="Err KB", description="KB with Minio error")
         session.add(kb)
@@ -177,7 +177,7 @@ class TestUploadKBDocuments:
             ("files", ("err.txt", io.BytesIO(file_content), "text/plain")),
         ]
 
-        mock_minio, _, _, _ = patch_kb_route_services
+        mock_minio = patch_external_services["mock_minio"]
         mock_minio.put_object.side_effect = MinioException(
             code="500",
             message="MinIO down",

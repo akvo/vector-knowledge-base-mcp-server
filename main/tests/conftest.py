@@ -12,7 +12,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from httpx import AsyncClient, ASGITransport
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -154,6 +154,8 @@ def patch_external_services(monkeypatch, tmp_path):
         kb_query_service,
         chromadb_service,
         minio_service,
+        document_service,
+        kb_service,
     )
 
     # ---------- MinIO mock ----------
@@ -173,6 +175,10 @@ def patch_external_services(monkeypatch, tmp_path):
         document_processor, "get_minio_client", lambda: mock_minio
     )
     monkeypatch.setattr(minio_service, "get_minio_client", lambda: mock_minio)
+    monkeypatch.setattr(kb_service, "get_minio_client", lambda: mock_minio)
+    monkeypatch.setattr(
+        document_service, "get_minio_client", lambda: mock_minio
+    )
 
     # ---------- Embeddings ----------
     mock_embeddings = MagicMock()
@@ -182,6 +188,12 @@ def patch_external_services(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         kb_query_service.EmbeddingsFactory, "create", lambda: mock_embeddings
+    )
+    monkeypatch.setattr(
+        kb_service.EmbeddingsFactory, "create", lambda: mock_embeddings
+    )
+    monkeypatch.setattr(
+        document_service.EmbeddingsFactory, "create", lambda: mock_embeddings
     )
 
     # ---------- Vector store ----------
@@ -206,6 +218,12 @@ def patch_external_services(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         kb_query_service, "ChromaVectorStore", lambda *a, **k: mock_vs
+    )
+    monkeypatch.setattr(
+        kb_service, "ChromaVectorStore", lambda *a, **k: mock_vs
+    )
+    monkeypatch.setattr(
+        document_service, "ChromaVectorStore", lambda *a, **k: mock_vs
     )
 
     # Async retriever for kb_query_service
@@ -243,6 +261,7 @@ def patch_external_services(monkeypatch, tmp_path):
         total_chunks=2,
     )
     monkeypatch.setattr(document_processor, "preview_document", mock_preview)
+    monkeypatch.setattr(document_service, "preview_document", mock_preview)
 
     return {
         "mock_minio": mock_minio,
@@ -253,62 +272,12 @@ def patch_external_services(monkeypatch, tmp_path):
 
 
 # -------------------------------
-# Mocks KB route service
-# -------------------------------
-@pytest.fixture
-def patch_kb_route_services():
-    """
-    Patch external services in KB routes:
-    - MinIO client
-    - Chroma vector store
-    - EmbeddingsFactory
-    - preview_document
-    """
-    with patch(
-        "app.api.v1.knowledge_base.router.get_minio_client"
-    ) as mock_get_minio_client, patch(
-        "app.api.v1.knowledge_base.router.ChromaVectorStore"
-    ) as mock_chroma_cls, patch(
-        "app.api.v1.knowledge_base.router.EmbeddingsFactory.create"
-    ) as mock_embeddings_create, patch(
-        "app.api.v1.knowledge_base.router.preview_document"
-    ) as mock_preview_doc:
-
-        # Create mock instances
-        mock_minio_client = MagicMock()
-        mock_vector_store = MagicMock()
-        mock_embeddings = MagicMock()
-
-        # Stub MinIO client methods
-        mock_minio_client.put_object.return_value = None
-        mock_minio_client.list_objects.return_value = []
-        mock_minio_client.remove_object.return_value = None
-
-        # Assign mocks to patch targets
-        mock_get_minio_client.return_value = mock_minio_client
-        mock_chroma_cls.return_value = mock_vector_store
-        mock_embeddings_create.return_value = mock_embeddings
-        mock_preview_doc.return_value = {
-            "chunks": [{"content": "dummy content", "metadata": {"page": 1}}],
-            "total_chunks": 1,
-        }
-
-        # Yield all mocks for use in tests
-        yield (
-            mock_minio_client,
-            mock_vector_store,
-            mock_embeddings,
-            mock_preview_doc,
-        )
-
-
-# -------------------------------
 # Fixture to patch MCP server vector store
 # -------------------------------
 @pytest.fixture
 def patch_mcp_server_vector_store(monkeypatch):
     import base64
-    from app.api.v1.knowledge_base import router as kb_router
+    import app.services.document_service as document_service
 
     mock_store = MagicMock(name="MockChromaVectorStore")
     mock_retriever = AsyncMock(name="MockRetriever")
@@ -329,7 +298,7 @@ def patch_mcp_server_vector_store(monkeypatch):
 
     # return mock_store
     monkeypatch.setattr(
-        kb_router, "ChromaVectorStore", lambda *a, **k: mock_store
+        document_service, "ChromaVectorStore", lambda *a, **k: mock_store
     )
 
     return mock_store
@@ -341,8 +310,9 @@ def patch_mcp_server_vector_store(monkeypatch):
 @pytest.fixture
 def run_test_server(patch_mcp_server_vector_store):
     import uvicorn
-    from multiprocessing import Process
     import requests
+
+    from multiprocessing import Process
     from app.main import app as main_app
 
     os.environ["TESTING"] = "1"

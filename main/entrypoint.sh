@@ -51,5 +51,3 @@ else
         --limit-max-requests 1000 \
         --log-level info
 fi
-
-wait -n

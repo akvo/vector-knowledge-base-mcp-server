@@ -10,13 +10,12 @@ echo "📦 Environment: $APP_ENV"
 echo "📡 FastAPI Host: $HOST"
 echo "🔌 FastAPI Port: $PORT"
 
-
 if ! command -v psql >/dev/null 2>&1; then
     echo "❌ psql not found! Please install postgresql-client in your Dockerfile"
     exit 1
 fi
 
-# Tunggu Postgres siap menggunakan DATABASE_URL
+# Wait for Postgres
 echo "⏳ Waiting for Postgres..."
 until psql "$DATABASE_URL" -c '\q' 2>/dev/null; do
     echo "   Postgres not ready yet..."
@@ -33,14 +32,24 @@ else
     exit 1
 fi
 
-# Start server
-
+# --- START SERVER ---
 if [ "$APP_ENV" = "dev" ]; then
     echo "🔧 Starting in development mode..."
-    uvicorn app.main:app --host "$HOST" --port "$PORT" --reload &
+    uvicorn app.main:app \
+        --host "$HOST" \
+        --port "$PORT" \
+        --reload \
+        --timeout-keep-alive 300
 else
-    echo "🚀 Starting in production mode..."
-    uvicorn app.main:app --host "$HOST" --port "$PORT" --workers 2 &
+    echo "🚀 Starting in production mode (optimized for long-lived MCP streams)..."
+    uvicorn app.main:app \
+        --host "$HOST" \
+        --port "$PORT" \
+        --workers 2 \
+        --timeout-keep-alive 300 \
+        --graceful-timeout 60 \
+        --limit-max-requests 1000 \
+        --log-level info
 fi
 
 wait -n

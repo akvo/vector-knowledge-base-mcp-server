@@ -10,12 +10,13 @@ echo "📦 Environment: $APP_ENV"
 echo "📡 FastAPI Host: $HOST"
 echo "🔌 FastAPI Port: $PORT"
 
+# --- Check psql ---
 if ! command -v psql >/dev/null 2>&1; then
     echo "❌ psql not found! Please install postgresql-client in your Dockerfile"
     exit 1
 fi
 
-# Wait for Postgres
+# --- Wait for Postgres to be ready ---
 echo "⏳ Waiting for Postgres..."
 until psql "$DATABASE_URL" -c '\q' 2>/dev/null; do
     echo "   Postgres not ready yet..."
@@ -23,7 +24,7 @@ until psql "$DATABASE_URL" -c '\q' 2>/dev/null; do
 done
 echo "✅ Postgres is ready!"
 
-# Run migrations
+# --- Run Alembic migrations ---
 echo "🗄️ Running migrations..."
 if alembic upgrade head; then
     echo "✅ Migrations completed successfully"
@@ -32,7 +33,7 @@ else
     exit 1
 fi
 
-# --- START SERVER ---
+# --- Start Server ---
 if [ "$APP_ENV" = "dev" ]; then
     echo "🔧 Starting in development mode..."
     uvicorn app.main:app \
@@ -47,7 +48,7 @@ else
         --port "$PORT" \
         --workers 2 \
         --timeout-keep-alive 300 \
-        --graceful-timeout 60 \
+        --timeout-graceful-shutdown 60 \
         --limit-max-requests 1000 \
         --log-level info
 fi

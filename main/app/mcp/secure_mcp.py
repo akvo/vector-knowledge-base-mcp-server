@@ -11,6 +11,7 @@ class SecureFastMCP(FastMCP):
     def http_app(self, path: str = "/mcp") -> FastAPI:
         app = super().http_app(path=path)
 
+        # --- Middleware Auth ---
         @app.middleware("http")
         async def auth_middleware(request: Request, call_next):
             # Only for mcp path
@@ -23,7 +24,6 @@ class SecureFastMCP(FastMCP):
                         status_code=401,
                         content={"detail": "Authorization header required"},
                     )
-
                 if self.auth:
                     try:
                         await self.auth.authenticate(auth_header)
@@ -33,7 +33,14 @@ class SecureFastMCP(FastMCP):
                             status_code=401,
                             content={"detail": "Invalid or inactive API key"},
                         )
-
             return await call_next(request)
+
+        # --- Keep-Alive Middleware ---
+        @app.middleware("http")
+        async def keep_alive_middleware(request: Request, call_next):
+            response = await call_next(request)
+            response.headers["Connection"] = "keep-alive"
+            response.headers["Keep-Alive"] = "timeout=600, max=1000"
+            return response
 
         return app

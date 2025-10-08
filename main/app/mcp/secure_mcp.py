@@ -40,7 +40,8 @@ class SecureFastMCP(FastMCP):
         async def keep_alive_middleware(request: Request, call_next):
             response = await call_next(request)
             response.headers["Connection"] = "keep-alive"
-            response.headers["Keep-Alive"] = "timeout=600, max=1000"
+            response.headers["Keep-Alive"] = "timeout=3600, max=10000"
+            response.headers["Cache-Control"] = "no-store"
             return response
 
         return app

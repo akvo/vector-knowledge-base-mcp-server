@@ -40,7 +40,11 @@ if [ "$APP_ENV" = "dev" ]; then
         --host "$HOST" \
         --port "$PORT" \
         --reload \
+        --workers 2 \
         --timeout-keep-alive 3600
+        --timeout-graceful-shutdown 120 \
+        --limit-max-requests 10000 \
+        --log-level info
 else
     echo "🚀 Starting in production mode (optimized for long-lived MCP streams)..."
     uvicorn app.main:app \

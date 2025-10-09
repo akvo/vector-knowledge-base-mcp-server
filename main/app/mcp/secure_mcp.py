@@ -39,9 +39,11 @@ class SecureFastMCP(FastMCP):
         @app.middleware("http")
         async def keep_alive_middleware(request: Request, call_next):
             response = await call_next(request)
+            # Ensure long-lived MCP streams don’t get closed by ALB or Ingress
             response.headers["Connection"] = "keep-alive"
-            response.headers["Keep-Alive"] = "timeout=3600, max=10000"
+            response.headers["Keep-Alive"] = "timeout=86400, max=100000"
             response.headers["Cache-Control"] = "no-store"
+            response.headers["X-MCP-Stream"] = "true"
             return response
 
         return app

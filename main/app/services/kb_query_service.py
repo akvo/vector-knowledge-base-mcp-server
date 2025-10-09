@@ -1,8 +1,12 @@
 import json
 import base64
 import logging
+import time
+import asyncio
+
 from typing import List
 from sqlalchemy.orm import Session
+from asyncio.exceptions import TimeoutError
 
 from app.db.connection import get_session
 from app.models.knowledge import KnowledgeBase, Document
@@ -12,7 +16,55 @@ from app.services.embedding_factory import EmbeddingsFactory
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+_cached_embeddings = None
 
+
+def get_embeddings():
+    global _cached_embeddings
+    if _cached_embeddings is None:
+        _cached_embeddings = EmbeddingsFactory.create()
+        logger.info(
+            "✅ Embeddings model initialized and cached: %s",
+            _cached_embeddings.__class__.__name__,
+        )
+    return _cached_embeddings
+
+
+async def safe_similarity_search(
+    vector_store, query: str, k: int, timeout: int = 30
+):
+    """Run Chroma similarity search in a threadpool with timeout handling."""
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(
+                vector_store.similarity_search_with_score, query, k
+            ),
+            timeout=timeout,
+        )
+    except TimeoutError:
+        logger.warning("⚠️ Chroma search timed out after %s seconds", timeout)
+        return []
+    except Exception as e:
+        logger.error("❌ Chroma search failed: %s", e, exc_info=True)
+        return []
+
+
+# ---- 🩺 Heartbeat coroutine ----
+async def heartbeat_task(interval: int = 10):
+    """
+    Periodically logs to keep connection active.
+    Useful behind NAT or idle connection layers.
+    """
+    try:
+        while True:
+            logger.debug("💓 [Keepalive] MCP query still running...")
+            await asyncio.sleep(interval)
+    except asyncio.CancelledError:
+        logger.debug("🫧 [Keepalive] Stopped.")
+        raise
+
+
+# ---- Main MCP Tool Function ----
 async def query_vector_kbs(
     query: str, knowledge_base_ids: List[int], top_k: int = 10
 ):
@@ -33,44 +85,45 @@ async def query_vector_kbs(
     empty_context = base64.b64encode(
         json.dumps({"context": []}).encode()
     ).decode()
+    start_time = time.time()
+    logger.info(
+        "🧠 [MCP] Querying KBs %s | Query='%s' | top_k=%d",
+        knowledge_base_ids,
+        query,
+        top_k,
+    )
 
-    logger.info("Querying knowledge bases: %s", knowledge_base_ids)
-    logger.info("Query string: %s", query)
-    logger.info("Top K: %d", top_k)
-
+    # Start heartbeat
+    heartbeat = asyncio.create_task(heartbeat_task(10))  # every 10s
     try:
+        # ---- Load KBs ----
         knowledge_bases = (
             db.query(KnowledgeBase)
             .filter(KnowledgeBase.id.in_(knowledge_base_ids))
             .all()
         )
         if not knowledge_bases:
-            logger.warning(
-                "No active knowledge base found for IDs: %s",
-                knowledge_base_ids,
+            note = (
+                f"No active knowledge base found for IDs: {knowledge_base_ids}"
             )
-            return {
-                "context": empty_context,
-                "note": "No active knowledge base found for given IDs.",
-            }
+            logger.warning(note)
+            return {"context": empty_context, "note": note}
 
-        embeddings = EmbeddingsFactory.create()
-        logger.info(
-            "Embedding model created: %s", embeddings.__class__.__name__
-        )
-
-        # Multiple KBs
+        embeddings = get_embeddings()
         all_results = []
+
+        # ---- Process each KB ----
         for kb in knowledge_bases:
-            logger.info("Checking KB %d - %s", kb.id, kb.name)
+            kb_start = time.time()
+            logger.info("🔍 [KB %d] Checking KB: %s", kb.id, kb.name)
 
             docs_exist = (
                 db.query(Document)
                 .filter(Document.knowledge_base_id == kb.id)
-                .all()
+                .first()
             )
             if not docs_exist:
-                logger.warning("KB %d has no documents.", kb.id)
+                logger.warning("⚠️ Skip [KB %d] No documents found", kb.id)
                 continue
 
             # Vector store retriever
@@ -79,40 +132,44 @@ async def query_vector_kbs(
                 embedding_function=embeddings,
             )
 
-            logger.info(
-                "Querying vector store for relevant documents (async)..."
-            )
-            logger.info(
-                "Chroma collection '%s' has %d documents",
-                kb.id,
-                vector_store._store._collection.count(),
-            )
+            try:
+                doc_count = vector_store._store._collection.count()
+                logger.info(
+                    "📚 [KB %d] Collection loaded with %d docs",
+                    kb.id,
+                    doc_count,
+                )
+            except Exception:
+                logger.warning("⚠️ [KB %d] Could not count docs", kb.id)
+                doc_count = 0
 
-            # Use similarity search with scores
-            results = vector_store.similarity_search_with_score(query, k=top_k)
-            logger.info("Retrieved %d results from KB %d", len(results), kb.id)
+            results = await safe_similarity_search(
+                vector_store, query, k=top_k, timeout=60
+            )
+            logger.info(
+                "✅ [KB %d] Retrieved %d results in %.2fs",
+                kb.id,
+                len(results),
+                time.time() - kb_start,
+            )
 
             for doc, score in results:
                 doc.metadata["knowledge_base_id"] = kb.id
                 all_results.append((doc, score))
 
+        # ---- Aggregate results ----
         if not all_results:
-            return {
-                "context": empty_context,
-                "note": "No relevant documents found across selected KBs.",
-            }
+            note = "No relevant documents found across selected KBs."
+            return {"context": empty_context, "note": note}
 
-        # Sort globally by score (lower distance = more relevant)
         all_results.sort(key=lambda x: x[1])
-
-        # Trim to global top_k
         top_results = all_results[:top_k]
 
         serializable_context = [
             {
                 "page_content": doc.page_content,
                 "metadata": doc.metadata,
-                "score": score,
+                "score": float(score),
             }
             for doc, score in top_results
         ]
@@ -121,12 +178,28 @@ async def query_vector_kbs(
             json.dumps({"context": serializable_context}).encode()
         ).decode()
 
-        return {"context": base64_context}
+        total_time = time.time() - start_time
+        logger.info(
+            "✅ [MCP] Query completed in %.2fs, returning %d results",
+            total_time,
+            len(top_results),
+        )
+
+        return {
+            "context": base64_context,
+            "note": f"Query finished in {total_time:.2f}s",
+        }
 
     except Exception as e:
-        logger.exception("Error querying KBs: %s", e)
+        logger.exception("💥 [MCP] Error querying KBs: %s", e)
         return {"context": empty_context, "note": f"Error: {str(e)}"}
 
     finally:
+        # Stop heartbeat and close DB
+        heartbeat.cancel()
+        try:
+            await heartbeat
+        except asyncio.CancelledError:
+            pass
         db.close()
-        logger.info("Database session closed.")
+        logger.debug("🧹 Database session closed.")

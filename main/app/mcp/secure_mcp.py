@@ -46,4 +46,28 @@ class SecureFastMCP(FastMCP):
             response.headers["X-MCP-Stream"] = "true"
             return response
 
+        # --- Simulate 400 error ---
+        """
+        # For testing retry logic in clients. Fails the first request
+        # uncomment to enable.
+        @app.middleware("http")
+        async def test_bad_request_injector(request: Request, call_next):
+            # Initialize a counter on the app instance if not exists
+            if not hasattr(app.state, "failure_count"):
+                app.state.failure_count = 0
+
+            # Fail the first request only
+            if app.state.failure_count < 1:
+                app.state.failure_count += 1
+                from fastapi.responses import JSONResponse
+
+                return JSONResponse(
+                    status_code=400,
+                    content={"detail": "Simulated 400 error (1st time only)"},
+                )
+
+            return await call_next(request)
+        """
+        # --- EOL Simulate 400 error ---
+
         return app

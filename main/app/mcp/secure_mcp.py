@@ -8,7 +8,9 @@ logger = logging.getLogger(__name__)
 
 
 class SecureFastMCP(FastMCP):
-    def http_app(self, path: str = "/mcp") -> FastAPI:
+    def http_app(
+        self, path: str = "/mcp", stateless_http: bool = False
+    ) -> FastAPI:
         app = super().http_app(path=path)
 
         # --- Middleware Auth ---
@@ -44,6 +46,11 @@ class SecureFastMCP(FastMCP):
             response.headers["Keep-Alive"] = "timeout=86400, max=100000"
             response.headers["Cache-Control"] = "no-store"
             response.headers["X-MCP-Stream"] = "true"
+
+            # If stateless_http=True, you can modify response headers
+            if stateless_http:
+                response.headers["X-MCP-Mode"] = "stateless"
+
             return response
 
         # --- Simulate 400 error ---

@@ -11,7 +11,7 @@ class SecureFastMCP(FastMCP):
     def http_app(
         self, path: str = "/mcp", stateless_http: bool = False
     ) -> FastAPI:
-        app = super().http_app(path=path)
+        app = super().http_app(path=path, stateless_http=stateless_http)
 
         # --- Middleware Auth ---
         @app.middleware("http")

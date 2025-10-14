@@ -6,15 +6,19 @@ from fastapi import (
     UploadFile,
     BackgroundTasks,
     Depends,
+    HTTPException,
 )
 from sqlalchemy.orm import Session
 
 from app.db.connection import get_session
+from app.core.security import get_api_key
+from app.models.knowledge import KnowledgeBase
+from app.models.api_key import APIKey
 from app.services.document_service import DocumentService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/knowledge-base")
+router = APIRouter()
 
 
 @router.post(
@@ -25,16 +29,33 @@ async def full_process_documents(
     files: List[UploadFile],
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
 ):
     """
     Upload + process documents in one call (no preview).
     """
-    doc_service = DocumentService(kb_id, db)
+    try:
+        # Ensure KB exists
+        kb = db.query(KnowledgeBase).filter_by(id=kb_id).first()
+        if not kb:
+            raise HTTPException(
+                status_code=404, detail="Knowledge base not found"
+            )
 
-    # 1️⃣ Upload documents
-    upload_results = await doc_service.upload_documents(files)
+        doc_service = DocumentService(kb_id, db)
 
-    # 2️⃣ Immediately schedule background processing
-    return await doc_service.process_documents(
-        upload_results, background_tasks
-    )
+        # 1️⃣ Upload documents
+        upload_results = await doc_service.upload_documents(files)
+
+        # 2️⃣ Process documents
+        return await doc_service.process_documents(
+            upload_results, background_tasks
+        )
+
+    except HTTPException:
+        # Re-raise FastAPI HTTPExceptions directly
+        raise
+    except Exception as e:
+        # Catch all unexpected errors
+        logger.error("💥 Exception in full_process_documents", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

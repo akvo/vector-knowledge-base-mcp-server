@@ -58,6 +58,17 @@ async def cleanup_temp_files(
     return await service.cleanup_temp_files()
 
 
+@router.get("/{kb_id}/documents", name="v1_get_kb_documents")
+async def get_kb_documents(
+    kb_id: int,
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
+):
+    """Fetch all documents belonging to a Knowledge Base (by kb_id)."""
+    service = DocumentService(kb_id, db)
+    return service.get_documents()
+
+
 @router.get("/{kb_id}/documents/tasks", name="v1_get_processing_tasks")
 async def get_processing_tasks(
     kb_id: int,

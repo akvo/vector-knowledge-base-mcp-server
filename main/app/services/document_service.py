@@ -328,3 +328,36 @@ class DocumentService:
             }
             for doc, score in results
         ]
+
+    # -----------------------
+    # Get Documents
+    # -----------------------
+    def get_documents(self):
+        """Return all documents for the given Knowledge Base."""
+        kb = self.db.query(KnowledgeBase).filter_by(id=self.kb_id).first()
+        if not kb:
+            raise HTTPException(
+                status_code=404,
+                detail="Knowledge base not found",
+            )
+
+        docs = (
+            self.db.query(DocumentUpload)
+            .filter(DocumentUpload.knowledge_base_id == self.kb_id)
+            .order_by(DocumentUpload.created_at.desc())
+            .all()
+        )
+
+        return [
+            {
+                "id": doc.id,
+                "file_name": doc.file_name,
+                "status": doc.status,
+                "knowledge_base_id": doc.knowledge_base_id,
+                "content_type": doc.content_type,
+                "created_at": (
+                    doc.created_at.isoformat() if doc.created_at else None
+                ),
+            }
+            for doc in docs
+        ]

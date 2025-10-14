@@ -1,7 +1,6 @@
 import io
 import pytest
 
-from fastapi import status
 from app.models.knowledge import KnowledgeBase
 
 
@@ -23,7 +22,7 @@ class TestFullProcessKBDocuments:
             files=files,
         )
 
-        assert res.status_code == status.HTTP_401_UNAUTHORIZED
+        assert res.status_code == 401
         assert res.json()["detail"] == "API key required"
 
     async def test_full_process_success(
@@ -54,7 +53,7 @@ class TestFullProcessKBDocuments:
             files=files,
         )
 
-        assert res.status_code == status.HTTP_200_OK
+        assert res.status_code == 200
         data = res.json()
         assert data["message"] == "Documents accepted for processing"
         assert len(data["tasks"]) == 1
@@ -92,5 +91,5 @@ class TestFullProcessKBDocuments:
             files=files,
         )
 
-        assert res.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert res.status_code == 500
         assert "upload failed" in res.json()["detail"].lower()

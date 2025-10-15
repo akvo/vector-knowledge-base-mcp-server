@@ -23,10 +23,11 @@ from minio.commonconfig import CopySource
 from app.db.connection import get_session
 from app.core.config import settings
 from app.services.minio_service import get_minio_client
-from app.models.knowledge import ProcessingTask, Document, DocumentChunk
+from app.models.knowledge import Document, DocumentChunk
 from app.services.chunk_record import ChunkRecord
 from app.services.chromadb_service import ChromaVectorStore
 from app.services.embedding_factory import EmbeddingsFactory
+from app.services.processing_task_service import ProcessingTaskService
 
 
 class UploadResult(BaseModel):
@@ -296,7 +297,8 @@ async def process_document_background(
     else:
         should_close_db = False
 
-    task = db.query(ProcessingTask).get(task_id)
+    task_service = ProcessingTaskService(db)
+    task = task_service.get_task(task_id)
     if not task:
         logger.error(f"Task {task_id} not found")
         return

@@ -361,3 +361,28 @@ async def mcp_client(api_key_value: str, run_test_server: str):
     url = f"{run_test_server}/mcp/"
     async with Client(url, auth=f"API-Key {api_key_value}") as client:
         yield client
+
+
+@pytest.fixture
+def patch_document_service(monkeypatch):
+    """Patch DocumentService to return a mock instance with async methods."""
+    import app.api.v1.knowledge_base.document_full_process_router as router_module  # noqa
+
+    mock_instance = AsyncMock()
+    mock_instance.upload_documents = AsyncMock(
+        return_value=[{"upload_id": 1, "file_name": "mocked.txt"}]
+    )
+    mock_instance.process_documents = AsyncMock(
+        return_value={
+            "message": "Documents accepted for processing",
+            "tasks": [
+                {"id": 1, "upload_id": 1, "status": "pending"},
+            ],
+        }
+    )
+
+    # When router calls DocumentService(kb_id, db), return this mock instance
+    mock_class = lambda *args, **kwargs: mock_instance  # noqa
+
+    monkeypatch.setattr(router_module, "DocumentService", mock_class)
+    return mock_instance

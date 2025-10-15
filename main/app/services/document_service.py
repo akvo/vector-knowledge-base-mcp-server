@@ -22,6 +22,7 @@ from app.services.document_processor import (
     process_document_background,
     PreviewResult,
 )
+from app.services.processing_task_service import ProcessingTaskService
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -171,6 +172,8 @@ class DocumentService:
                 status_code=404, detail="Knowledge base not found"
             )
 
+        task_service = ProcessingTaskService(self.db)
+
         upload_ids = [
             r["upload_id"]
             for r in upload_results
@@ -186,19 +189,13 @@ class DocumentService:
         )
         uploads_dict = {u.id: u for u in uploads}
 
-        tasks = [
-            ProcessingTask(
-                document_upload_id=uid,
-                knowledge_base_id=self.kb_id,
-                status="pending",
-            )
-            for uid in upload_ids
-            if uploads_dict.get(uid)
-        ]
-        self.db.add_all(tasks)
-        self.db.commit()
-        [self.db.refresh(t) for t in tasks]
+        tasks = []
+        for uid in upload_ids:
+            if uid in uploads_dict:
+                task = task_service.create_task(self.kb_id, uid)
+                tasks.append(task)
 
+        # enqueue background processing
         task_data = [
             {
                 "task_id": t.id,
@@ -208,8 +205,8 @@ class DocumentService:
             }
             for t in tasks
         ]
-
         background_tasks.add_task(self._enqueue_processing, task_data)
+
         return {
             "tasks": [
                 {"upload_id": t.document_upload_id, "task_id": t.id}
@@ -330,4 +327,37 @@ class DocumentService:
                 "score": float(score),
             }
             for doc, score in results
+        ]
+
+    # -----------------------
+    # Get Documents Uploaded
+    # -----------------------
+    def get_documents_upload(self):
+        """Return all documents for the given Knowledge Base."""
+        kb = self.db.query(KnowledgeBase).filter_by(id=self.kb_id).first()
+        if not kb:
+            raise HTTPException(
+                status_code=404,
+                detail="Knowledge base not found",
+            )
+
+        docs = (
+            self.db.query(DocumentUpload)
+            .filter(DocumentUpload.knowledge_base_id == self.kb_id)
+            .order_by(DocumentUpload.created_at.desc())
+            .all()
+        )
+
+        return [
+            {
+                "id": doc.id,
+                "file_name": doc.file_name,
+                "status": doc.status,
+                "knowledge_base_id": doc.knowledge_base_id,
+                "content_type": doc.content_type,
+                "created_at": (
+                    doc.created_at.isoformat() if doc.created_at else None
+                ),
+            }
+            for doc in docs
         ]

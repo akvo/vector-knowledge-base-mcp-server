@@ -330,9 +330,9 @@ class DocumentService:
         ]
 
     # -----------------------
-    # Get Documents
+    # Get Documents Uploaded
     # -----------------------
-    def get_documents(self):
+    def get_documents_upload(self):
         """Return all documents for the given Knowledge Base."""
         kb = self.db.query(KnowledgeBase).filter_by(id=self.kb_id).first()
         if not kb:

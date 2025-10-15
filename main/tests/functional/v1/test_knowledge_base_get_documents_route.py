@@ -42,7 +42,7 @@ class TestGetKBDocuments:
         session.commit()
 
         res = await client.get(
-            app.url_path_for("v1_get_kb_documents", kb_id=kb.id),
+            app.url_path_for("v1_get_kb_documents_upload", kb_id=kb.id),
             headers=self.get_headers(api_key_value),
         )
 
@@ -63,7 +63,7 @@ class TestGetKBDocuments:
     ):
         """❌ Should return 404 if KB does not exist"""
         res = await client.get(
-            app.url_path_for("v1_get_kb_documents", kb_id=9999),
+            app.url_path_for("v1_get_kb_documents_upload", kb_id=9999),
             headers=self.get_headers(api_key_value),
         )
 
@@ -79,7 +79,7 @@ class TestGetKBDocuments:
         session.commit()
 
         res = await client.get(
-            app.url_path_for("v1_get_kb_documents", kb_id=kb.id),
+            app.url_path_for("v1_get_kb_documents_upload", kb_id=kb.id),
             headers=self.get_headers(api_key_value),
         )
 

@@ -9,7 +9,11 @@ from app.core.security import get_api_key
 from app.models.api_key import APIKey
 from app.services.document_service import DocumentService
 from app.services.document_processor import PreviewResult
-from app.api.v1.knowledge_base.schema import PreviewRequest, DocumentResponse
+from app.api.v1.knowledge_base.schema import (
+    PreviewRequest,
+    DocumentResponse,
+    DocumentUploadItem,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -58,15 +62,21 @@ async def cleanup_temp_files(
     return await service.cleanup_temp_files()
 
 
-@router.get("/{kb_id}/documents", name="v1_get_kb_documents")
-async def get_kb_documents(
+@router.get(
+    "/{kb_id}/documents/upload",
+    response_model=List[DocumentUploadItem],
+    name="v1_get_kb_documents_upload",
+)
+async def get_kb_documents_upload(
     kb_id: int,
     db: Session = Depends(get_session),
     api_key: APIKey = Depends(get_api_key),
 ):
-    """Fetch all documents belonging to a Knowledge Base (by kb_id)."""
+    """
+    Fetch all documents uploaded belonging to a Knowledge Base (by kb_id).
+    """
     service = DocumentService(kb_id, db)
-    return service.get_documents()
+    return service.get_documents_upload()
 
 
 @router.get("/{kb_id}/documents/tasks", name="v1_get_processing_tasks")

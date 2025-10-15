@@ -232,7 +232,7 @@ class TestDocumentService:
         session.commit()
 
         service = DocumentService(kb.id, session)
-        result = service.get_documents()
+        result = service.get_documents_upload()
 
         assert len(result) == 2
         for doc_data, doc in zip(result, docs):

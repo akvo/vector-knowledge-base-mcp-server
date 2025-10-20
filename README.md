@@ -19,7 +19,10 @@ A high-performance FastAPI/FastMCP-based Model Context Protocol (MCP) server tha
     - [Development Setup](#development-setup)
     - [Production Setup](#production-setup)
     - [Service Ports (dev)](#service-ports-dev)
-  - [🔑 Authentication](#-authentication)
+  - [🔑 Authentication and API Keys](#-authentication-and-api-keys)
+    - [Using the Admin API Key](#using-the-admin-api-key)
+    - [Using the API Key](#using-the-api-key)
+    - [Summary Table](#summary-table)
   - [📖 API Documentation](#-api-documentation)
   - [📁 Project Structure](#-project-structure)
   - [🚨 Troubleshooting](#-troubleshooting)
@@ -188,22 +191,53 @@ ADMIN_API_KEY=your-admin-api-key-here
 | MinIO Console | 9101 | 9001 | MinIO web interface |
 | PgAdmin | 5550 | - | Database admin (dev only) |
 
-## 🔑 Authentication
+## 🔑 Authentication and API Keys
 
-All protected routes require an API Key.
+This project uses **API keys** for authentication to access the Knowledge Base and Admin APIs. There are two types of keys:
+1. **Admin API Key** (`ADMIN_API_KEY`) – Used for administrative actions, such as creating or revoking other API keys.
+2. **API Key** – Generated via the Admin API to access the Knowledge Base endpoints.
 
-Requests must include the API key in the `Authorization` header:
+### Using the Admin API Key
+
+- Your `ADMIN_API_KEY` is defined in your `.env` file.
+- To perform administrative tasks, include it in the `Authorization` header:
+
+```http
+Authorization: Admin-API-Key <your_admin_api_key>
+```
+
+**Example: Create a new API key via Admin endpoint**
+
+```bash
+curl -X POST http://localhost:8100/api/v1/api-key \
+  -H "Authorization: Admin-Key sk_xxxxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "app-name", "is_active": true}'
+```
+
+### Using the API Key
+
+- The generated API key is used to access protected Knowledge Base endpoints.
+- Include it in the `Authorization` header:
 
 ```http
 Authorization: API-Key <your_api_key>
 ```
 
-Example:
+**Example: Query the Knowledge Base**
+
 ```bash
 curl -X GET http://localhost:8100/api/v1/knowledge-base \
-  -H "Authorization: API-Key sk_test_xxxxxxx"
+  -H "Authorization: API-Key sk_xxxxxxx"
 ```
-👉 See SECURITY.md
+👉 For the detail of `API-Key` usage, please read: SECURITY.md
+
+### Summary Table
+
+| Key Type      | Header Name                          | Purpose                                    |
+| ------------- | ------------------------------------ | ------------------------------------------ |
+| Admin API Key | `Authorization: Admin-Key <key>` | Manage API keys and administrative tasks   |
+| User/API Key  | `Authorization: API-Key <key>`       | Access Knowledge Base and perform CRUD ops |
 
 
 ## 📖 API Documentation

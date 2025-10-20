@@ -200,3 +200,43 @@ class TestDocumentService:
         with pytest.raises(HTTPException) as exc:
             service.search("hello")
         assert exc.value.status_code == 500
+
+    async def test_get_documents_success(self, session):
+        """✅ Should return all documents with content_type for a KB"""
+        kb = KnowledgeBase(name="KB Docs", description="list documents")
+        session.add(kb)
+        session.commit()
+
+        # Create some documents
+        docs = [
+            DocumentUpload(
+                knowledge_base_id=kb.id,
+                file_name="file1.txt",
+                file_hash="hash1",
+                file_size=10,
+                content_type="text/plain",
+                temp_path=f"kb_{kb.id}/temp/file1.txt",
+                status="processed",
+            ),
+            DocumentUpload(
+                knowledge_base_id=kb.id,
+                file_name="file2.txt",
+                file_hash="hash2",
+                file_size=20,
+                content_type="application/pdf",
+                temp_path=f"kb_{kb.id}/temp/file2.txt",
+                status="pending",
+            ),
+        ]
+        session.add_all(docs)
+        session.commit()
+
+        service = DocumentService(kb.id, session)
+        result = service.get_documents_upload()
+
+        assert len(result) == 2
+        for doc_data, doc in zip(result, docs):
+            assert doc_data["id"] == doc.id
+            assert doc_data["file_name"] == doc.file_name
+            assert doc_data["status"] == doc.status
+            assert doc_data["content_type"] == doc.content_type

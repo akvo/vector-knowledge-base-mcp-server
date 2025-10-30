@@ -24,7 +24,7 @@ jobs:
       - name: Checkout repo (for local actions)
         uses: actions/checkout@v4
 
-      - name: Checkout source code to src/
+      - name: Checkout source code tosrc/
         uses: actions/checkout@v4
         with:
           path: src
@@ -46,7 +46,7 @@ jobs:
         with:
           app-name: ${{ steps.env.outputs.app_name }}
           service-name: "main"
-          dockerfile-location: "src/main/Dockerfile"
+          dockerfile-location: "main/Dockerfile"
           cluster-name: "test"
 
       - name: Docker Build Script
@@ -54,7 +54,7 @@ jobs:
         with:
           app-name: ${{ steps.env.outputs.app_name }}
           service-name: "script"
-          dockerfile-location: "src/script/Dockerfile"
+          dockerfile-location: script/Dockerfile"
           cluster-name: "test"
 
       - name: Docker Push Main App

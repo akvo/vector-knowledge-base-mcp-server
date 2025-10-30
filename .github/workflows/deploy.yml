@@ -21,22 +21,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: run-tests
     steps:
-      # 1️⃣ Checkout root repo untuk local actions & configs
       - name: Checkout repo (for local actions)
         uses: actions/checkout@v4
 
-      # 2️⃣ Checkout source code (kalau butuh build context src/)
       - name: Checkout source code to src/
         uses: actions/checkout@v4
         with:
           path: src
 
-      # 3️⃣ Resolve App Env (local composite action di root)
       - name: Resolve App Env
         id: env
         uses: ./.github/actions/resolve-app-env
 
-      # 4️⃣ Checkout Akvo composite actions
       - name: Checkout Akvo composite actions
         uses: actions/checkout@v4
         with:
@@ -45,7 +41,6 @@ jobs:
           path: composite-actions
           ref: 0.0.10
 
-      # 5️⃣ Build and Push
       - name: Docker Build Main App
         uses: ./composite-actions/.github/actions/docker-build
         with:

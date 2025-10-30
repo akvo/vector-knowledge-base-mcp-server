@@ -27,7 +27,7 @@ jobs:
 
       - name: Resolve App Env
         id: env
-        uses: ./.github/actions/resolve-app-env/action.yml
+        uses: ./src/.github/actions/resolve-app-env/action.yml
 
       - name: Checkout Akvo composite actions
         uses: actions/checkout@v4
@@ -83,7 +83,7 @@ jobs:
 
       - name: Resolve App Env
         id: env
-        uses: ./.github/actions/resolve-app-env/action.yml
+        uses: ./src/.github/actions/resolve-app-env/action.yml
 
       - name: Checkout Akvo composite actions
         uses: actions/checkout@v4

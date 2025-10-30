@@ -1,25 +1,42 @@
 name: "Resolve App and Namespace Name"
 description: "Determine app and namespace based on branch name"
+
 outputs:
   app_name:
     description: "App name"
   namespace_name:
     description: "Namespace name"
+
 runs:
   using: "composite"
   steps:
-    - run: |
+    - name: Determine App and Namespace
+      shell: bash
+      run: |
         BRANCH=${GITHUB_REF_NAME}
-        SUFFIX=${BRANCH#deployment-}
-        SAFE=$(echo "$SUFFIX" \
-          | tr '[:upper:]' '[:lower:]' \
-          | sed 's/[^a-z0-9-]/-/g' \
-          | sed 's/--*/-/g' \
-          | sed 's/^-//' \
-          | sed 's/-$//' \
-          | cut -c1-50)
-        APP_NAME="${SAFE}-kb-mcp-server"
-        NAMESPACE="${SAFE}-kb-mcp-server-namespace"
+
+        if [[ "$BRANCH" == "main" ]]; then
+          # === MAIN BRANCH ===
+          APP_NAME="kb-mcp-server"
+          NAMESPACE="kb-mcp-server-namespace"
+          echo "✅ Detected main branch, using default names"
+        else
+          # === DEPLOYMENT BRANCH ===
+          SUFFIX=${BRANCH#deployment-}
+          SAFE=$(echo "$SUFFIX" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed 's/[^a-z0-9-]/-/g' \
+            | sed 's/--*/-/g' \
+            | sed 's/^-//' \
+            | sed 's/-$//' \
+            | cut -c1-50)
+          APP_NAME="${SAFE}-kb-mcp-server"
+          NAMESPACE="${SAFE}-kb-mcp-server-namespace"
+          echo "✅ Detected deployment branch, using dynamic names"
+        fi
+
         echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
         echo "namespace_name=$NAMESPACE" >> $GITHUB_OUTPUT
-      shell: bash
+
+        echo "App name: $APP_NAME"
+        echo "Namespace: $NAMESPACE"

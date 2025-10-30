@@ -21,17 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: run-tests
     steps:
-      - name: Checkout repo (for local actions)
-        uses: actions/checkout@v4
-
-      - name: Checkout source code tosrc/
+      - name: Checkout source
         uses: actions/checkout@v4
         with:
           path: src
 
       - name: Resolve App Env
         id: env
-        uses: ./.github/actions/resolve-app-env
+        uses: ./src/.github/actions/resolve-app-env
 
       - name: Checkout Akvo composite actions
         uses: actions/checkout@v4
@@ -81,12 +78,14 @@ jobs:
       name: branch-test-deployment
 
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          path: src
 
       - name: Resolve App Env
         id: env
-        uses: ./.github/actions/resolve-app-env
+        uses: ./src/.github/actions/resolve-app-env
 
       - name: Checkout Akvo composite actions
         uses: actions/checkout@v4

@@ -29,7 +29,32 @@ jobs:
 
       - name: Resolve App Env
         id: env
-        uses: ./src/.github/actions/resolve-app-env
+        run: |
+          BRANCH=${GITHUB_REF_NAME}
+
+          if [[ "$BRANCH" == "main" ]]; then
+            APP_NAME="kb-mcp-server"
+            NAMESPACE="kb-mcp-server-namespace"
+            echo "✅ Detected main branch, using default names"
+          else
+            SUFFIX=${BRANCH#deployment-}
+            SAFE=$(echo "$SUFFIX" \
+              | tr '[:upper:]' '[:lower:]' \
+              | sed 's/[^a-z0-9-]/-/g' \
+              | sed 's/--*/-/g' \
+              | sed 's/^-//' \
+              | sed 's/-$//' \
+              | cut -c1-50)
+            APP_NAME="${SAFE}-kb-mcp-server"
+            NAMESPACE="${SAFE}-kb-mcp-server-namespace"
+            echo "✅ Detected deployment branch, using dynamic names"
+          fi
+
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+          echo "namespace_name=$NAMESPACE" >> $GITHUB_OUTPUT
+
+          echo "App name: $APP_NAME"
+          echo "Namespace: $NAMESPACE"
 
       - name: Checkout Akvo composite actions
         uses: actions/checkout@v4
@@ -41,9 +66,6 @@ jobs:
 
       - name: Docker Build Main App
         uses: ./composite-actions/.github/actions/docker-build
-        env:
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          GITHUB_SHA: ${{ github.sha }}
         with:
           app-name: ${{ steps.env.outputs.app_name }}
           service-name: "main"
@@ -52,9 +74,6 @@ jobs:
 
       - name: Docker Build Script
         uses: ./composite-actions/.github/actions/docker-build
-        env:
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          GITHUB_SHA: ${{ github.sha }}
         with:
           app-name: ${{ steps.env.outputs.app_name }}
           service-name: "script"
@@ -92,7 +111,32 @@ jobs:
 
       - name: Resolve App Env
         id: env
-        uses: ./src/.github/actions/resolve-app-env
+        run: |
+          BRANCH=${GITHUB_REF_NAME}
+
+          if [[ "$BRANCH" == "main" ]]; then
+            APP_NAME="kb-mcp-server"
+            NAMESPACE="kb-mcp-server-namespace"
+            echo "✅ Detected main branch, using default names"
+          else
+            SUFFIX=${BRANCH#deployment-}
+            SAFE=$(echo "$SUFFIX" \
+              | tr '[:upper:]' '[:lower:]' \
+              | sed 's/[^a-z0-9-]/-/g' \
+              | sed 's/--*/-/g' \
+              | sed 's/^-//' \
+              | sed 's/-$//' \
+              | cut -c1-50)
+            APP_NAME="${SAFE}-kb-mcp-server"
+            NAMESPACE="${SAFE}-kb-mcp-server-namespace"
+            echo "✅ Detected deployment branch, using dynamic names"
+          fi
+
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+          echo "namespace_name=$NAMESPACE" >> $GITHUB_OUTPUT
+
+          echo "App name: $APP_NAME"
+          echo "Namespace: $NAMESPACE"
 
       - name: Checkout Akvo composite actions
         uses: actions/checkout@v4
@@ -104,9 +148,6 @@ jobs:
 
       - name: Rollout Main App
         uses: ./composite-actions/.github/actions/k8s-rollout
-        env:
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          GITHUB_SHA: ${{ github.sha }}
         with:
           app-name: ${{ steps.env.outputs.app_name }}
           deployment-name: "main-deployment"
@@ -117,9 +158,6 @@ jobs:
 
       - name: Rollout Script
         uses: ./composite-actions/.github/actions/k8s-rollout
-        env:
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          GITHUB_SHA: ${{ github.sha }}
         with:
           app-name: ${{ steps.env.outputs.app_name }}
           deployment-name: "script-deployment"

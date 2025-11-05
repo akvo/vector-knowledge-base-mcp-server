@@ -11,6 +11,7 @@ from minio.error import MinioException
 from app.models.knowledge import (
     KnowledgeBase,
     Document,
+    DocumentChunk,
     DocumentUpload,
     ProcessingTask,
 )
@@ -24,6 +25,7 @@ from app.services.document_processor import (
 )
 from app.services.processing_task_service import ProcessingTaskService
 from app.core.config import settings
+from app.utils.mime_utils import get_file_info
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +35,6 @@ class DocumentService:
         self.kb_id = kb_id
         self.db = db
 
-    # -----------------------
-    # Upload
-    # -----------------------
     async def upload_documents(self, files: List[UploadFile]):
         kb = (
             self.db.query(KnowledgeBase)
@@ -114,9 +113,6 @@ class DocumentService:
 
         return results
 
-    # -----------------------
-    # Preview
-    # -----------------------
     async def preview_documents(
         self, preview_request
     ) -> Dict[int, PreviewResult]:
@@ -156,9 +152,6 @@ class DocumentService:
 
         return results
 
-    # -----------------------
-    # Processing
-    # -----------------------
     async def process_documents(
         self, upload_results: List[dict], background_tasks: BackgroundTasks
     ):
@@ -229,9 +222,6 @@ class DocumentService:
             f"Queued {len(task_data)} processing tasks for KB {self.kb_id}"
         )
 
-    # -----------------------
-    # Cleanup
-    # -----------------------
     async def cleanup_temp_files(self):
         expired_time = datetime.utcnow() - timedelta(hours=24)
         expired_uploads = (
@@ -253,9 +243,6 @@ class DocumentService:
 
         return {"message": f"Cleaned {len(expired_uploads)} expired uploads"}
 
-    # -----------------------
-    # Tasks
-    # -----------------------
     async def get_processing_tasks(self, task_ids: str):
         ids = [int(i.strip()) for i in task_ids.split(",")]
         kb = (
@@ -291,9 +278,6 @@ class DocumentService:
             for t in tasks
         }
 
-    # -----------------------
-    # Get Document
-    # -----------------------
     async def get_document(self, doc_id: int):
         doc = (
             self.db.query(Document)
@@ -306,9 +290,6 @@ class DocumentService:
             raise HTTPException(status_code=404, detail="Document not found")
         return doc
 
-    # -----------------------
-    # Retrieval
-    # -----------------------
     def search(self, query: str, top_k: int = 5):
         embeddings = EmbeddingsFactory.create()
         vector_store = ChromaVectorStore(
@@ -329,9 +310,6 @@ class DocumentService:
             for doc, score in results
         ]
 
-    # -----------------------
-    # Get Documents Uploaded
-    # -----------------------
     def get_documents_upload(self):
         """Return all documents for the given Knowledge Base."""
         kb = self.db.query(KnowledgeBase).filter_by(id=self.kb_id).first()
@@ -361,3 +339,143 @@ class DocumentService:
             }
             for doc in docs
         ]
+
+    async def delete_document(self, document_id: int, user=None):
+        """
+        Delete a document from either `documents` or `document_uploads`,
+        along with MinIO and Chroma cleanup.
+        """
+        doc = (
+            self.db.query(Document)
+            .filter(
+                Document.id == document_id,
+                Document.knowledge_base_id == self.kb_id,
+            )
+            .first()
+        )
+        upload = None
+
+        # If not found in main table, check uploads
+        if not doc:
+            upload = (
+                self.db.query(DocumentUpload)
+                .filter(
+                    DocumentUpload.id == document_id,
+                    DocumentUpload.knowledge_base_id == self.kb_id,
+                )
+                .first()
+            )
+            if not upload:
+                raise HTTPException(
+                    status_code=404, detail="Document not found"
+                )
+
+        # Permission validation
+        if user and not user.is_admin:
+            raise HTTPException(
+                status_code=403, detail="Not authorized to delete"
+            )
+
+        minio_client = get_minio_client()
+        chroma_deleted = False
+        minio_deleted = False
+
+        # Delete from Chroma (only for processed)
+        if doc:
+            try:
+                vector_store = ChromaVectorStore(
+                    collection_name=f"kb_{self.kb_id}",
+                    embedding_function=EmbeddingsFactory.create(),
+                )
+                vector_store.delete(filter={"document_id": str(document_id)})
+                chroma_deleted = True
+            except Exception as e:
+                logger.warning(
+                    f"Chroma delete failed for document {document_id}: {e}"
+                )
+
+        # Delete from MinIO
+        file_path = doc.file_path if doc else upload.temp_path
+        try:
+            minio_client.remove_object(settings.minio_bucket_name, file_path)
+            minio_deleted = True
+            logger.info(f"Deleted object from MinIO: {file_path}")
+        except Exception as e:
+            logger.warning(f"Failed to delete from MinIO ({file_path}): {e}")
+
+        # Database Cleanup
+        try:
+            if doc:
+                self.db.query(DocumentChunk).filter_by(
+                    document_id=doc.id
+                ).delete()
+                self.db.delete(doc)
+            elif upload:
+                self.db.delete(upload)
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=500, detail=f"DB cleanup failed: {e}"
+            )
+
+        return {
+            "success": True,
+            "message": "Document deleted successfully",
+            "document_id": document_id,
+            "deleted_from": "documents" if doc else "document_uploads",
+            "chroma_deleted": chroma_deleted,
+            "minio_deleted": minio_deleted,
+        }
+
+    async def get_presigned_file_info(self, doc_id: int):
+        doc = (
+            self.db.query(Document)
+            .filter(
+                Document.id == doc_id,
+                Document.knowledge_base_id == self.kb_id,
+            )
+            .first()
+        )
+        upload = None
+        if not doc:
+            upload = (
+                self.db.query(DocumentUpload)
+                .filter(
+                    DocumentUpload.id == doc_id,
+                    DocumentUpload.knowledge_base_id == self.kb_id,
+                )
+                .first()
+            )
+            if not upload:
+                raise HTTPException(
+                    status_code=404, detail="Document not found"
+                )
+
+        file_name = doc.file_name if doc else upload.file_name
+        file_path = doc.file_path if doc else upload.temp_path
+
+        minio_client = get_minio_client()
+        try:
+            url = minio_client.presigned_get_object(
+                bucket_name=settings.minio_bucket_name,
+                object_name=file_path,
+                expires=timedelta(hours=1),
+            )
+        except Exception as e:
+            logger.error(f"Presigned URL generation failed: {e}")
+            raise HTTPException(
+                status_code=500, detail="Failed to generate presigned URL"
+            )
+
+        file_info = get_file_info(file_name)
+
+        return {
+            "document_id": doc_id,
+            "file_name": file_name,
+            "file_path": url,
+            "file_type": file_info["mime_type"],
+            "file_extension": file_info["file_extension"],
+            "is_viewable_in_browser": file_info["is_viewable_in_browser"],
+            "source": "documents" if doc else "document_uploads",
+        }

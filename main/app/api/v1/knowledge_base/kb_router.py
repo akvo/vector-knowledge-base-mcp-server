@@ -1,7 +1,7 @@
 import logging
 from typing import List, Any, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload, selectinload, noload
+from sqlalchemy.orm import Session, joinedload, selectinload, noload, lazyload
 from sqlalchemy import or_, func
 
 from app.db.connection import get_session
@@ -49,8 +49,6 @@ def create_knowledge_base(
     name="v1_list_knowledge_bases",
 )
 def get_knowledge_bases(
-    db: Session = Depends(get_session),
-    api_key: APIKey = Depends(get_api_key),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
     with_documents: bool = Query(
@@ -60,6 +58,8 @@ def get_knowledge_bases(
         False, description="Include total count wrapper"
     ),
     search: Optional[str] = Query(None, description="Search by name"),
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
 ):
     base_query = db.query(KnowledgeBase)
 
@@ -102,17 +102,29 @@ def get_knowledge_bases(
 )
 def get_knowledge_base(
     kb_id: int,
+    with_documents: bool = Query(
+        True, description="Include documents in response"
+    ),
     db: Session = Depends(get_session),
     api_key: APIKey = Depends(get_api_key),
-) -> Any:
-    kb = (
-        db.query(KnowledgeBase)
-        .options(joinedload(KnowledgeBase.documents))
-        .filter(KnowledgeBase.id == kb_id)
-        .first()
-    )
+):
+    query = db.query(KnowledgeBase)
+
+    if with_documents:
+        query = query.options(joinedload(KnowledgeBase.documents))
+    else:
+        # prevent lazy loading & return empty list
+        query = query.options(lazyload(KnowledgeBase.documents))
+
+    kb = query.filter(KnowledgeBase.id == kb_id).first()
+
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    # If skipping documents, force empty list (not lazy-loaded)
+    if not with_documents:
+        kb.documents = []
+
     return kb
 
 

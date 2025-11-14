@@ -270,6 +270,51 @@ class TestKnowledgeBaseRoutes:
         assert res.status_code == 404
         assert res.json()["detail"] == "Knowledge base not found"
 
+    async def test_get_kb_with_documents(
+        self, app, client, api_key_value, session
+    ):
+        kb = KnowledgeBase(name="One KB", description="Test")
+        session.add(kb)
+        session.commit()
+        session.refresh(kb)
+
+        doc = Document(
+            file_path="/tmp/doc.txt",
+            file_name="doc.txt",
+            file_size=10,
+            content_type="text/plain",
+            file_hash="abc123",
+            knowledge_base_id=kb.id,
+        )
+        session.add(doc)
+        session.commit()
+
+        res = await client.get(
+            app.url_path_for("v1_get_knowledge_base", kb_id=kb.id),
+            headers=self.get_headers(api_key_value),
+            params={"with_documents": True},
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert len(data["documents"]) == 1
+
+    async def test_get_kb_without_documents(
+        self, app, client, api_key_value, session
+    ):
+        kb = KnowledgeBase(name="One KB2", description="Test")
+        session.add(kb)
+        session.commit()
+        session.refresh(kb)
+
+        res = await client.get(
+            app.url_path_for("v1_get_knowledge_base", kb_id=kb.id),
+            headers=self.get_headers(api_key_value),
+            params={"with_documents": False},
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["documents"] == []
+
     async def test_update_kb_and_not_found(
         self,
         app: FastAPI,

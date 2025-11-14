@@ -66,7 +66,7 @@ class KnowledgeBaseResponse(KnowledgeBaseBase):
     id: int
     created_at: datetime
     updated_at: datetime
-    documents: List[DocumentResponse] = []
+    documents: Optional[List[DocumentResponse]] = []
 
     class Config:
         from_attributes = True
@@ -92,3 +92,8 @@ class DocumentUploadItem(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class PaginatedKnowledgeBaseResponse(BaseModel):
+    total: int
+    items: List[KnowledgeBaseResponse]

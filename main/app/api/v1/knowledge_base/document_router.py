@@ -103,3 +103,31 @@ async def get_document(
 ) -> Any:
     service = DocumentService(kb_id, db)
     return await service.get_document(doc_id)
+
+
+@router.get(
+    "/{kb_id}/documents/{document_id}/view",
+    name="v1_view_kb_document",
+)
+async def get_kb_document_file(
+    kb_id: int,
+    document_id: int,
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
+):
+    service = DocumentService(kb_id, db)
+    return await service.get_presigned_file_info(document_id)
+
+
+@router.delete(
+    "/{kb_id}/documents/{document_id}",
+    name="v1_delete_kb_document",
+)
+async def delete_kb_document(
+    kb_id: int,
+    document_id: int,
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
+):
+    service = DocumentService(kb_id, db)
+    return await service.delete_document(document_id)

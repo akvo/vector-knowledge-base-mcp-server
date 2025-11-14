@@ -163,8 +163,8 @@ class TestKnowledgeBaseRoutes:
         data = res.json()
         assert isinstance(data, dict)
         assert "total" in data
-        assert "items" in data
-        assert isinstance(data["items"], list)
+        assert "data" in data
+        assert isinstance(data["data"], list)
 
     async def test_list_kb_without_total(
         self,

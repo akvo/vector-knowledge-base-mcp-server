@@ -1,8 +1,8 @@
 import logging
 from typing import List, Any, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload, selectinload, noload, lazyload
-from sqlalchemy import or_, func
+from sqlalchemy.orm import Session, joinedload, lazyload, noload
+from sqlalchemy import or_
 
 from app.db.connection import get_session
 from app.core.security import get_api_key
@@ -43,8 +43,7 @@ def create_knowledge_base(
 @router.get(
     "",
     response_model=Union[
-        List[KnowledgeBaseResponse],
-        PaginatedKnowledgeBaseResponse,
+        List[KnowledgeBaseResponse], PaginatedKnowledgeBaseResponse
     ],
     name="v1_list_knowledge_bases",
 )
@@ -55,44 +54,58 @@ def get_knowledge_bases(
         True, description="Include documents in response"
     ),
     include_total: bool = Query(
-        False, description="Include total count wrapper"
+        False, description="Return paginated response"
     ),
-    search: Optional[str] = Query(None, description="Search by name"),
+    search: Optional[str] = Query(
+        None, description="Search by name or description"
+    ),
     db: Session = Depends(get_session),
     api_key: APIKey = Depends(get_api_key),
-):
-    base_query = db.query(KnowledgeBase)
-
-    # --- Search filter ---
+) -> Any:
+    """
+    List knowledge bases.
+    Supports pagination, search, and optional total wrapping.
+    """
+    query = db.query(KnowledgeBase)
+    # 🔍 Search in BOTH name + description
     if search:
-        base_query = base_query.filter(
+        like = f"%{search}%"
+        query = query.filter(
             or_(
-                KnowledgeBase.name.ilike(f"%{search}%"),
-                KnowledgeBase.description.ilike(f"%{search}%"),
+                KnowledgeBase.name.ilike(like),
+                KnowledgeBase.description.ilike(like),
             )
         )
 
-    # --- Optional total count ---
-    total = None
-    if include_total:
-        total = base_query.with_entities(func.count(KnowledgeBase.id)).scalar()
-
-    # --- Data query (paginated) ---
-    data_query = base_query.order_by(KnowledgeBase.id)
-
-    # Conditional loading of documents
+    # ⚡ Load documents only when requested
     if with_documents:
-        data_query = data_query.options(selectinload(KnowledgeBase.documents))
+        query = query.options(joinedload(KnowledgeBase.documents))
     else:
-        data_query = data_query.options(noload(KnowledgeBase.documents))
+        # Prevent any document loading — do NOT load relationship
+        query = query.options(noload(KnowledgeBase.documents))
 
-    items = data_query.offset(skip).limit(limit).all()
+    # Pagination
+    items = query.offset(skip).limit(limit).all()
 
-    # --- Conditional response format ---
-    if include_total:
-        return PaginatedKnowledgeBaseResponse(total=total, items=items)
+    # 🔒 Ensure documents array is always present but empty when requested
+    if not with_documents:
+        for kb in items:
+            kb.documents = []  # avoids lazy loading
 
-    return items
+    # Return simple list
+    if not include_total:
+        return items
+
+    # Pagination metadata
+    total = query.count()
+    page = skip // limit + 1
+
+    return PaginatedKnowledgeBaseResponse(
+        total=total,
+        page=page,
+        size=len(items),
+        data=items,
+    )
 
 
 @router.get(

@@ -1,18 +1,20 @@
 import logging
 
-from typing import List, Dict, Any
+from typing import List, Optional, Union, Dict, Any
 from fastapi import APIRouter, Depends, UploadFile, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 
 from app.db.connection import get_session
 from app.core.security import get_api_key
 from app.models.api_key import APIKey
+from app.models.knowledge import Document
 from app.services.document_service import DocumentService
 from app.services.document_processor import PreviewResult
 from app.api.v1.knowledge_base.schema import (
     PreviewRequest,
     DocumentResponse,
     DocumentUploadItem,
+    PaginatedDocumentResponse,
 )
 
 router = APIRouter()
@@ -60,6 +62,54 @@ async def cleanup_temp_files(
 ):
     service = DocumentService(None, db)
     return await service.cleanup_temp_files()
+
+
+@router.get(
+    "/{kb_id}/documents",
+    response_model=Union[List[DocumentResponse], PaginatedDocumentResponse],
+    name="v1_list_kb_documents",
+)
+async def list_kb_documents(
+    kb_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1),
+    include_total: bool = Query(
+        False, description="Return paginated response"
+    ),
+    search: Optional[str] = Query(
+        None, description="Search by partial filename"
+    ),
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
+):
+    """
+    List documents belonging to a Knowledge Base.
+    Supports pagination, search, and optional total wrapping.
+    """
+    query = db.query(Document).filter(Document.knowledge_base_id == kb_id)
+
+    if search:
+        query = query.filter(Document.file_name.ilike(f"%{search}%"))
+
+    # Get paginated items
+    items = query.offset(skip).limit(limit).all()
+
+    # If no pagination wrapper requested → return plain list
+    if not include_total:
+        return items
+
+    # Compute total ONLY when requested
+    total = query.count()
+
+    # Convert skip/limit to page number
+    page = skip // limit + 1
+
+    return PaginatedDocumentResponse(
+        total=total,
+        page=page,
+        size=len(items),
+        data=items,
+    )
 
 
 @router.get(

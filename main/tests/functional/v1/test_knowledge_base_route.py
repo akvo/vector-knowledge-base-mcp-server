@@ -3,7 +3,7 @@ from httpx import AsyncClient
 from fastapi import FastAPI
 from sqlalchemy.orm import Session
 
-from app.models.knowledge import KnowledgeBase
+from app.models.knowledge import KnowledgeBase, Document
 
 
 @pytest.mark.asyncio
@@ -58,6 +58,185 @@ class TestKnowledgeBaseRoutes:
         assert isinstance(data, list)
         assert len(data) >= 1
 
+    async def test_list_kb_without_documents(
+        self,
+        app: FastAPI,
+        client: AsyncClient,
+        api_key_value: str,
+        session: Session,
+    ):
+        # --- Insert KB directly ---
+        kb = KnowledgeBase(name="KB Docs", description="With docs")
+        session.add(kb)
+        session.commit()
+        session.refresh(kb)
+
+        # --- Insert document directly ---
+        doc = Document(
+            file_path="/tmp/doc1.txt",
+            file_name="doc1.txt",
+            file_hash="doc1-hash",
+            file_size=10,
+            content_type="text/plain",
+            knowledge_base_id=kb.id,
+        )
+        session.add(doc)
+        session.commit()
+        session.refresh(doc)
+
+        # Now list with_documents=false
+        res = await client.get(
+            app.url_path_for("v1_list_knowledge_bases"),
+            headers=self.get_headers(api_key_value),
+            params={"with_documents": False},
+        )
+        assert res.status_code == 200
+
+        data = res.json()
+        assert isinstance(data, list)
+        assert len(data) >= 1
+
+        # Validate documents not loaded
+        first = next((x for x in data if x["id"] == kb.id), None)
+        assert first is not None
+        assert first["documents"] == []  # not loaded
+
+    async def test_list_kb_with_documents(
+        self,
+        app: FastAPI,
+        client: AsyncClient,
+        api_key_value: str,
+        session: Session,
+    ):
+        # Create KB directly
+        kb = KnowledgeBase(name="KB Docs 2", description="Test")
+        session.add(kb)
+        session.commit()
+        session.refresh(kb)
+
+        # Add doc directly
+        doc = Document(
+            file_path="/tmp/doc2.txt",
+            file_name="doc2.txt",
+            file_hash="doc2-hash",
+            file_size=10,
+            content_type="text/plain",
+            knowledge_base_id=kb.id,
+        )
+        session.add(doc)
+        session.commit()
+        session.refresh(doc)
+
+        # Call list
+        res = await client.get(
+            app.url_path_for("v1_list_knowledge_bases"),
+            headers=self.get_headers(api_key_value),
+            params={"with_documents": True},
+        )
+        assert res.status_code == 200
+
+        data = res.json()
+        found = next((x for x in data if x["id"] == kb.id), None)
+        assert found is not None
+        assert len(found["documents"]) == 1
+
+    async def test_list_kb_with_total(
+        self,
+        app: FastAPI,
+        client: AsyncClient,
+        api_key_value: str,
+        session: Session,
+    ):
+        # seed 1 KB
+        kb = KnowledgeBase(name="WithTotalKB", description="Test")
+        session.add(kb)
+        session.commit()
+        session.refresh(kb)
+
+        res = await client.get(
+            app.url_path_for("v1_list_knowledge_bases"),
+            headers=self.get_headers(api_key_value),
+            params={"include_total": True},
+        )
+        assert res.status_code == 200
+
+        data = res.json()
+        assert isinstance(data, dict)
+        assert "total" in data
+        assert "data" in data
+        assert isinstance(data["data"], list)
+
+    async def test_list_kb_without_total(
+        self,
+        app: FastAPI,
+        client: AsyncClient,
+        api_key_value: str,
+        session: Session,
+    ):
+        # seed 1 KB
+        kb = KnowledgeBase(name="WithoutTotalKB", description="Test")
+        session.add(kb)
+        session.commit()
+        session.refresh(kb)
+
+        res = await client.get(
+            app.url_path_for("v1_list_knowledge_bases"),
+            headers=self.get_headers(api_key_value),
+            params={"include_total": False},
+        )
+        assert res.status_code == 200
+
+        data = res.json()
+        assert isinstance(data, list)
+
+    async def test_list_kb_search(
+        self,
+        app: FastAPI,
+        client: AsyncClient,
+        api_key_value: str,
+        session: Session,
+    ):
+        # Create a KB with unique name
+        kb = KnowledgeBase(name="SearchMeXYZ", description="Test search")
+        session.add(kb)
+        session.commit()
+        session.refresh(kb)
+
+        # Search
+        res = await client.get(
+            app.url_path_for("v1_list_knowledge_bases"),
+            headers=self.get_headers(api_key_value),
+            params={"search": "XYZ"},
+        )
+        assert res.status_code == 200
+
+        data = res.json()
+        assert any(item["name"] == "SearchMeXYZ" for item in data)
+
+    async def test_list_kb_pagination(
+        self,
+        app: FastAPI,
+        client: AsyncClient,
+        api_key_value: str,
+        session: Session,
+    ):
+        # Ensure at least 3 KBs exist with direct insert
+        for i in range(3):
+            kb = KnowledgeBase(name=f"PageKB{i}", description="pagination")
+            session.add(kb)
+        session.commit()
+
+        res = await client.get(
+            app.url_path_for("v1_list_knowledge_bases"),
+            headers=self.get_headers(api_key_value),
+            params={"skip": 1, "limit": 1, "include_total": False},
+        )
+        assert res.status_code == 200
+
+        data = res.json()
+        assert isinstance(data, list)
+        assert len(data) == 1  # exact page
+
     async def test_get_kb_and_not_found(
         self,
         app: FastAPI,
@@ -90,6 +269,51 @@ class TestKnowledgeBaseRoutes:
         )
         assert res.status_code == 404
         assert res.json()["detail"] == "Knowledge base not found"
+
+    async def test_get_kb_with_documents(
+        self, app, client, api_key_value, session
+    ):
+        kb = KnowledgeBase(name="One KB", description="Test")
+        session.add(kb)
+        session.commit()
+        session.refresh(kb)
+
+        doc = Document(
+            file_path="/tmp/doc.txt",
+            file_name="doc.txt",
+            file_size=10,
+            content_type="text/plain",
+            file_hash="abc123",
+            knowledge_base_id=kb.id,
+        )
+        session.add(doc)
+        session.commit()
+
+        res = await client.get(
+            app.url_path_for("v1_get_knowledge_base", kb_id=kb.id),
+            headers=self.get_headers(api_key_value),
+            params={"with_documents": True},
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert len(data["documents"]) == 1
+
+    async def test_get_kb_without_documents(
+        self, app, client, api_key_value, session
+    ):
+        kb = KnowledgeBase(name="One KB2", description="Test")
+        session.add(kb)
+        session.commit()
+        session.refresh(kb)
+
+        res = await client.get(
+            app.url_path_for("v1_get_knowledge_base", kb_id=kb.id),
+            headers=self.get_headers(api_key_value),
+            params={"with_documents": False},
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["documents"] == []
 
     async def test_update_kb_and_not_found(
         self,

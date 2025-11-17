@@ -69,6 +69,7 @@ def get_knowledge_bases(
     query = db.query(KnowledgeBase)
     # 🔍 Search in BOTH name + description
     if search:
+        search = search.strip()
         like = f"%{search}%"
         query = query.filter(
             or_(

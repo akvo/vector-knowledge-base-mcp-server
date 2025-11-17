@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, TypeVar, Generic
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -66,7 +66,7 @@ class KnowledgeBaseResponse(KnowledgeBaseBase):
     id: int
     created_at: datetime
     updated_at: datetime
-    documents: List[DocumentResponse] = []
+    documents: Optional[List[DocumentResponse]] = []
 
     class Config:
         from_attributes = True
@@ -92,3 +92,22 @@ class DocumentUploadItem(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+# PAGINATED RESPONSE =============
+T = TypeVar("T")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    total: int
+    page: int
+    size: int
+    data: List[T]
+
+
+class PaginatedKnowledgeBaseResponse(PaginatedResponse[KnowledgeBaseResponse]):
+    pass
+
+
+class PaginatedDocumentResponse(PaginatedResponse[DocumentResponse]):
+    pass

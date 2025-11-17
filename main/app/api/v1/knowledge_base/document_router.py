@@ -89,6 +89,7 @@ async def list_kb_documents(
     query = db.query(Document).filter(Document.knowledge_base_id == kb_id)
 
     if search:
+        search = search.strip()
         query = query.filter(Document.file_name.ilike(f"%{search}%"))
 
     # Get paginated items

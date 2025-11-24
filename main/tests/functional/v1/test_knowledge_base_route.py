@@ -237,6 +237,61 @@ class TestKnowledgeBaseRoutes:
         assert isinstance(data, list)
         assert len(data) == 1  # exact page
 
+    async def test_list_kb_filter_by_kb_ids(
+        self, app: FastAPI, client: AsyncClient, api_key_value: str
+    ):
+        """List knowledge bases"""
+        kb_ids = []
+
+        # Create knowledge bases
+        res = await client.post(
+            app.url_path_for("v1_create_knowledge_base"),
+            headers=self.get_headers(api_key_value),
+            json={"name": "Test KB 1", "description": "Desc"},
+        )
+        assert res.status_code == 200
+        res = res.json()
+        assert "id" in res
+        kb_ids.append(res["id"])
+
+        res = await client.post(
+            app.url_path_for("v1_create_knowledge_base"),
+            headers=self.get_headers(api_key_value),
+            json={"name": "Test KB 2", "description": "Desc"},
+        )
+        assert res.status_code == 200
+
+        res = await client.post(
+            app.url_path_for("v1_create_knowledge_base"),
+            headers=self.get_headers(api_key_value),
+            json={"name": "Test KB 3", "description": "Desc"},
+        )
+        assert res.status_code == 200
+        res = res.json()
+        assert "id" in res
+        kb_ids.append(res["id"])
+
+        # Now list
+        res = await client.get(
+            app.url_path_for("v1_list_knowledge_bases"),
+            headers=self.get_headers(api_key_value),
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert len(data) == 3
+
+        # List with kb_ids param
+        res = await client.get(
+            app.url_path_for("v1_list_knowledge_bases"),
+            headers=self.get_headers(api_key_value),
+            params={"kb_ids": kb_ids},
+        )
+        assert res.status_code == 200
+        data = res.json()
+        data_ids = [d.get("id") for d in data]
+        assert len(data) == 2
+        assert data_ids == kb_ids
+
     async def test_get_kb_and_not_found(
         self,
         app: FastAPI,

@@ -59,6 +59,9 @@ def get_knowledge_bases(
     search: Optional[str] = Query(
         None, description="Search by name or description"
     ),
+    kb_ids: Optional[List[int]] = Query(
+        None, description="Filter knowledge bases by definend kb IDs"
+    ),
     db: Session = Depends(get_session),
     api_key: APIKey = Depends(get_api_key),
 ) -> Any:
@@ -67,6 +70,11 @@ def get_knowledge_bases(
     Supports pagination, search, and optional total wrapping.
     """
     query = db.query(KnowledgeBase)
+
+    # Handle filtering by kb IDs
+    if kb_ids:
+        query = query.filter(KnowledgeBase.id.in_(kb_ids))
+
     # 🔍 Search in BOTH name + description
     if search:
         search = search.strip()

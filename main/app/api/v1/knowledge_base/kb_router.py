@@ -1,7 +1,8 @@
 import logging
-from typing import List, Any
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload
+from typing import List, Any, Optional, Union
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session, joinedload, lazyload, noload
+from sqlalchemy import or_
 
 from app.db.connection import get_session
 from app.core.security import get_api_key
@@ -12,6 +13,7 @@ from app.api.v1.knowledge_base.schema import (
     KnowledgeBaseCreate,
     KnowledgeBaseUpdate,
     KnowledgeBaseResponse,
+    PaginatedKnowledgeBaseResponse,
 )
 
 from app.mcp.mcp_main import mcp
@@ -40,16 +42,79 @@ def create_knowledge_base(
 
 @router.get(
     "",
-    response_model=List[KnowledgeBaseResponse],
+    response_model=Union[
+        List[KnowledgeBaseResponse], PaginatedKnowledgeBaseResponse
+    ],
     name="v1_list_knowledge_bases",
 )
 def get_knowledge_bases(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=100),
+    with_documents: bool = Query(
+        True, description="Include documents in response"
+    ),
+    include_total: bool = Query(
+        False, description="Return paginated response"
+    ),
+    search: Optional[str] = Query(
+        None, description="Search by name or description"
+    ),
+    kb_ids: Optional[List[int]] = Query(
+        None, description="Filter knowledge bases by definend kb IDs"
+    ),
     db: Session = Depends(get_session),
     api_key: APIKey = Depends(get_api_key),
-    skip: int = 0,
-    limit: int = 100,
 ) -> Any:
-    return db.query(KnowledgeBase).offset(skip).limit(limit).all()
+    """
+    List knowledge bases.
+    Supports pagination, search, and optional total wrapping.
+    """
+    query = db.query(KnowledgeBase)
+
+    # Handle filtering by kb IDs
+    if kb_ids:
+        query = query.filter(KnowledgeBase.id.in_(kb_ids))
+
+    # 🔍 Search in BOTH name + description
+    if search:
+        search = search.strip()
+        like = f"%{search}%"
+        query = query.filter(
+            or_(
+                KnowledgeBase.name.ilike(like),
+                KnowledgeBase.description.ilike(like),
+            )
+        )
+
+    # ⚡ Load documents only when requested
+    if with_documents:
+        query = query.options(joinedload(KnowledgeBase.documents))
+    else:
+        # Prevent any document loading — do NOT load relationship
+        query = query.options(noload(KnowledgeBase.documents))
+
+    # Pagination
+    items = query.offset(skip).limit(limit).all()
+
+    # 🔒 Ensure documents array is always present but empty when requested
+    if not with_documents:
+        for kb in items:
+            kb.documents = []  # avoids lazy loading
+
+    # Return simple list
+    if not include_total:
+        return items
+
+    # Pagination metadata
+    total = query.count()
+    page = skip // limit + 1
+
+    return PaginatedKnowledgeBaseResponse(
+        total=total,
+        page=page,
+        size=len(items),
+        data=items,
+    )
 
 
 @router.get(
@@ -59,17 +124,29 @@ def get_knowledge_bases(
 )
 def get_knowledge_base(
     kb_id: int,
+    with_documents: bool = Query(
+        True, description="Include documents in response"
+    ),
     db: Session = Depends(get_session),
     api_key: APIKey = Depends(get_api_key),
-) -> Any:
-    kb = (
-        db.query(KnowledgeBase)
-        .options(joinedload(KnowledgeBase.documents))
-        .filter(KnowledgeBase.id == kb_id)
-        .first()
-    )
+):
+    query = db.query(KnowledgeBase)
+
+    if with_documents:
+        query = query.options(joinedload(KnowledgeBase.documents))
+    else:
+        # prevent lazy loading & return empty list
+        query = query.options(lazyload(KnowledgeBase.documents))
+
+    kb = query.filter(KnowledgeBase.id == kb_id).first()
+
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    # If skipping documents, force empty list (not lazy-loaded)
+    if not with_documents:
+        kb.documents = []
+
     return kb
 
 

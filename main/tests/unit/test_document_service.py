@@ -3,27 +3,32 @@ import pytest
 from fastapi import HTTPException
 from unittest.mock import MagicMock
 from starlette.background import BackgroundTasks
+from datetime import datetime, timedelta
 
 from app.models.knowledge import (
     KnowledgeBase,
     DocumentUpload,
     ProcessingTask,
 )
-from app.services.document_service import DocumentService
+from app.services.document_service import DocumentService, Document
 from app.services.document_processor import PreviewResult
+from app.core.config import settings
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 class TestDocumentService:
     async def test_upload_documents_success(
-        self, session, patch_external_services, tmp_path
+        self, session, patch_external_services, mocker
     ):
         kb = KnowledgeBase(name="KB Upload", description="testing upload")
         session.add(kb)
         session.commit()
 
-        # fake upload file
+        mock_minio = patch_external_services["mock_minio"]
+        mock_put = mock_minio.put_object
+
+        # Fake upload file
         class DummyFile:
             def __init__(self, name, content=b"hello"):
                 self.filename = name
@@ -41,15 +46,46 @@ class TestDocumentService:
         service = DocumentService(kb.id, session)
 
         results = await service.upload_documents([file])
+
         assert results[0]["status"] == "pending"
         assert results[0]["file_name"] == "test.txt"
-        assert not results[0]["skip_processing"]
+
+        # ensure MinIO upload called
+        mock_put.assert_called_once()
 
     async def test_upload_documents_kb_not_found(self, session):
         service = DocumentService(999, session)
         with pytest.raises(HTTPException) as exc:
             await service.upload_documents([])
         assert exc.value.status_code == 404
+
+    async def test_upload_documents_minio_failure(
+        self, session, patch_external_services
+    ):
+        kb = KnowledgeBase(name="KB Upload Fail", description="testing fail")
+        session.add(kb)
+        session.commit()
+
+        mock_minio = patch_external_services["mock_minio"]
+        mock_minio.put_object.side_effect = Exception("MinIO failed")
+
+        class DummyFile:
+            filename = "bad.txt"
+            content_type = "text/plain"
+            file = MagicMock()
+
+            async def read(self):
+                return b"broken"
+
+            async def seek(self, pos):
+                return None
+
+        service = DocumentService(kb.id, session)
+
+        with pytest.raises(HTTPException) as exc:
+            await service.upload_documents([DummyFile()])
+
+        assert exc.value.status_code == 500
 
     async def test_preview_documents_success(
         self, session, patch_external_services
@@ -132,6 +168,39 @@ class TestDocumentService:
 
         service = DocumentService(kb.id, session)
         result = await service.cleanup_temp_files()
+        assert "Cleaned" in result["message"]
+
+    async def test_cleanup_temp_files_removes_minio_file(
+        self, session, patch_external_services, mocker
+    ):
+        kb = KnowledgeBase(name="KB Clean", description="clean test")
+        session.add(kb)
+        session.commit()
+
+        mock_minio = patch_external_services["mock_minio"]
+
+        # Make upload older than 24h
+        old_upload = DocumentUpload(
+            knowledge_base_id=kb.id,
+            file_name="old.txt",
+            file_hash="hash",
+            file_size=10,
+            content_type="text/plain",
+            temp_path="kb_1/temp/old.txt",
+        )
+        old_upload.created_at = datetime.utcnow() - timedelta(days=2)
+        session.add(old_upload)
+        session.commit()
+
+        service = DocumentService(kb.id, session)
+
+        result = await service.cleanup_temp_files()
+
+        # MinIO delete called
+        mock_minio.remove_object.assert_called_once_with(
+            settings.minio_bucket_name, "kb_1/temp/old.txt"
+        )
+
         assert "Cleaned" in result["message"]
 
     async def test_get_processing_tasks(self, session):
@@ -240,3 +309,67 @@ class TestDocumentService:
             assert doc_data["file_name"] == doc.file_name
             assert doc_data["status"] == doc.status
             assert doc_data["content_type"] == doc.content_type
+
+    async def test_delete_document_success(
+        self, session, patch_external_services, mocker
+    ):
+        kb = KnowledgeBase(name="KB Del", description="delete test")
+        session.add(kb)
+        session.commit()
+
+        # Prepare document
+        doc = Document(
+            knowledge_base_id=kb.id,
+            file_name="doc.txt",
+            file_hash="h",
+            file_size=10,
+            content_type="text/plain",
+            file_path="kb_1/documents/doc.txt",
+        )
+        session.add(doc)
+        session.commit()
+
+        mock_minio = patch_external_services["mock_minio"]
+        mock_vector_store = patch_external_services["mock_vector_store"]
+
+        service = DocumentService(kb.id, session)
+
+        result = await service.delete_document(doc.id, user=None)
+
+        # Ensure deletions happened
+        mock_minio.remove_object.assert_called_once()
+        mock_vector_store.delete.assert_called_once()
+
+        assert result["success"]
+        assert result["document_id"] == doc.id
+
+    async def test_get_presigned_file_info_success(self, session):
+        kb = KnowledgeBase(name="KB Info", description="info test")
+        session.add(kb)
+        session.commit()
+
+        doc = Document(
+            knowledge_base_id=kb.id,
+            file_name="file.pdf",
+            file_hash="h",
+            file_size=10,
+            content_type="application/pdf",
+            file_path=f"kb_{kb.id}/documents/file.pdf",
+        )
+        session.add(doc)
+        session.commit()
+
+        service = DocumentService(kb.id, session)
+
+        result = await service.get_presigned_file_info(doc.id)
+
+        # URL format: {minio_server_url}/{bucket}/{file_path}
+        expected_prefix = (
+            f"{settings.minio_server_url}/"
+            f"{settings.minio_bucket_name}/"
+            f"kb_{kb.id}/documents/file.pdf"
+        )
+        assert result["file_path"] == expected_prefix
+
+        assert result["file_name"] == "file.pdf"
+        assert result["document_id"] == doc.id

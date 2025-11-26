@@ -15,7 +15,9 @@ from app.models.knowledge import (
     DocumentUpload,
     ProcessingTask,
 )
-from app.services.minio_service import get_minio_client
+from app.services.minio_service import (
+    get_minio_client,
+)
 from app.services.embedding_factory import EmbeddingsFactory
 from app.services.chromadb_service import ChromaVectorStore
 from app.services.document_processor import (
@@ -87,6 +89,11 @@ class DocumentService:
                 logger.error(f"MinIO upload failed: {str(e)}")
                 raise HTTPException(
                     status_code=500, detail="Failed to upload file"
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to upload file to MinIO: {str(e)}",
                 )
 
             upload = DocumentUpload(
@@ -455,18 +462,13 @@ class DocumentService:
         file_name = doc.file_name if doc else upload.file_name
         file_path = doc.file_path if doc else upload.temp_path
 
-        minio_client = get_minio_client()
-        try:
-            url = minio_client.presigned_get_object(
-                bucket_name=settings.minio_bucket_name,
-                object_name=file_path,
-                expires=timedelta(hours=1),
-            )
-        except Exception as e:
-            logger.error(f"Presigned URL generation failed: {e}")
-            raise HTTPException(
-                status_code=500, detail="Failed to generate presigned URL"
-            )
+        # Create direct URL through Nginx proxy
+        # (no signature needed with public bucket)
+        # Format: http://localhost:8080/minio/BUCKET/OBJECT_PATH
+        url = f"{settings.minio_server_url}/{settings.minio_bucket_name}"
+        url = f"{url}/{file_path}"
+
+        logger.info(f"Generated direct URL: {url}")
 
         file_info = get_file_info(file_name)
 

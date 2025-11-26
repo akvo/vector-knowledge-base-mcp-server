@@ -23,6 +23,11 @@ A high-performance FastAPI/FastMCP-based Model Context Protocol (MCP) server tha
     - [Using the Admin API Key](#using-the-admin-api-key)
     - [Using the API Key](#using-the-api-key)
     - [Summary Table](#summary-table)
+  - [📦 MinIO Document Storage and Public Access](#-minio-document-storage-and-public-access)
+    - [How It Works](#how-it-works)
+    - [Configuration](#configuration)
+    - [Document URLs](#document-urls)
+    - [Security Considerations](#security-considerations)
   - [📖 API Documentation](#-api-documentation)
   - [📁 Project Structure](#-project-structure)
   - [🚨 Troubleshooting](#-troubleshooting)
@@ -95,6 +100,9 @@ Fill in the variables according to your environment:
 APP_ENV=dev
 APP_PORT=8100
 
+# Nginx
+NGINX_PORT=8080
+
 DATABASE_URL=postgresql://akvo:password@db:5432/kb_mcp
 
 # MinIO settings
@@ -102,6 +110,8 @@ MINIO_ENDPOINT=minio:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET_NAME=documents
+# Should be same as NGINX_PORT
+MINIO_SERVER_URL=http://localhost:8080/minio
 
 # Chroma DB settings
 CHROMA_DB_HOST=chromadb
@@ -124,6 +134,8 @@ ADMIN_API_KEY=your-admin-api-key-here
 - `VECTOR_STORE_BATCH_SIZE` controls how many documents are processed in a single batch when adding to the vector store. There is a trade off between performance and hitting limits on the number of chunks that can be stored at once default is 100 but you can tune this setting here.
 - `ADMIN_API_KEY` currently used for authentication to access the CRUD API keys endpoint. With this, the script can create an API key that will be used as the authentication token to access the CRUD Knowledge Base.
   - 👉 [How to generate `ADMIN_API_KEY`](./GENERATE_ADMIN_API_KEY.md)
+- `MINIO_ENDPOINT` is the internal Docker network address used by the FastAPI application to communicate with MinIO.
+- `MINIO_SERVER_URL` is the external URL that browsers use to access documents through the Nginx proxy. It should match your `NGINX_PORT`.
 
 ### Development Setup
 
@@ -190,6 +202,7 @@ ADMIN_API_KEY=your-admin-api-key-here
 | MinIO API | 9100 | 9000 | Object storage API |
 | MinIO Console | 9101 | 9001 | MinIO web interface |
 | PgAdmin | 5550 | - | Database admin (dev only) |
+| Nginx | 8080 | 80 | Reverse proxy |
 
 ## 🔑 Authentication and API Keys
 
@@ -239,6 +252,116 @@ curl -X GET http://localhost:8100/api/v1/knowledge-base \
 | Admin API Key | `Authorization: Admin-Key <key>` | Manage API keys and administrative tasks   |
 | User/API Key  | `Authorization: API-Key <key>`       | Access Knowledge Base and perform CRUD ops |
 
+## 📦 MinIO Document Storage and Public Access
+
+This application uses MinIO for object storage and provides public access to uploaded documents through an Nginx reverse proxy. This allows documents to be directly viewed or downloaded in web browsers without requiring AWS signature-based authentication.
+
+### How It Works
+
+The document access flow is designed to work seamlessly with Docker networking:
+
+```
+Browser Request
+    ↓
+http://localhost:8080/minio/documents/kb_1/file.pdf
+    ↓
+Nginx (port 8080) - Reverse Proxy
+    ↓
+MinIO Container (minio:9000) - Internal Docker Network
+    ↓
+Document Served
+```
+
+**Key Components:**
+
+1. **Internal Communication (`MINIO_ENDPOINT`)**:
+   - Used by FastAPI application for upload, delete, and management operations
+   - Format: `minio:9000`
+   - Only accessible within Docker network
+
+2. **External Access (`MINIO_SERVER_URL`)**:
+   - Used by browsers to access documents
+   - Format: `http://localhost:8080/minio`
+   - Routed through Nginx reverse proxy
+
+3. **Public Bucket Policy**:
+   - The MinIO bucket is configured with a public read policy
+   - Allows direct document access without AWS signatures
+   - Policy version `2012-10-17` is the AWS S3 standard (static, never changes)
+
+### Configuration
+
+**Environment Variables:**
+
+```env
+# Internal endpoint - used by FastAPI for operations
+MINIO_ENDPOINT=minio:9000
+
+# External endpoint - used by browsers to access files
+MINIO_SERVER_URL=http://localhost:8080/minio
+
+# MinIO credentials
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET_NAME=documents
+```
+
+**Nginx Configuration:**
+
+The Nginx proxy is configured to forward `/minio/*` requests to the MinIO service:
+
+```nginx
+location /minio/ {
+    proxy_pass http://minio/;
+    proxy_set_header Host $host;
+    # ... additional proxy settings
+}
+```
+
+### Document URLs
+
+When a document is uploaded and processed, the API returns URLs in this format:
+
+```json
+{
+  "document_id": 1,
+  "file_name": "example.pdf",
+  "file_path": "http://localhost:8080/minio/documents/kb_1/example.pdf",
+  "file_type": "application/pdf",
+  "is_viewable_in_browser": true
+}
+```
+
+These URLs can be:
+- Opened directly in a browser
+- Embedded in `<iframe>` elements
+- Used in PDF viewers
+- Downloaded via direct links
+
+### Security Considerations
+
+**Current Setup:**
+- Documents in the knowledge base are publicly readable
+- No authentication required for document access
+- Suitable for internal networks or non-sensitive data
+
+**For Production with Sensitive Data:**
+
+If you need to restrict document access, consider:
+
+1. **API-based Access**: Remove public bucket policy and stream documents through authenticated API endpoints
+2. **Nginx Authentication**: Add authentication at the Nginx level
+3. **Network Isolation**: Keep MinIO and Nginx on a private network
+4. **VPN/Firewall**: Restrict access to authorized networks only
+
+**To disable public access**, remove or modify the bucket policy in `minio_service.py`:
+
+```python
+# Comment out or remove this in init_minio()
+# set_bucket_public_read_policy(bucket_name)
+```
+
+Then implement authentication at the API or Nginx level based on your security requirements.
 
 ## 📖 API Documentation
 
@@ -250,7 +373,6 @@ From these interfaces, you can:
 - Try out endpoints directly
 - View request and response schemas
 - Test the API interactively
-
 
 ## 📁 Project Structure
 
@@ -268,6 +390,10 @@ vector-knowledge-base-mcp-server/
 │   ├── tests/                     # Unit / integration tests
 │   ├── Dockerfile
 │   └── requirements.txt
+├── nginx/                         # Nginx reverse proxy
+│   ├── conf.d/
+│   │   └── default.conf          # Nginx configuration
+│   └── Dockerfile
 ├── db/
 │   ├── docker-entrypoint-initdb.d/ # Init SQL scripts
 │   └── script/                    # Migration / seed
@@ -278,7 +404,6 @@ vector-knowledge-base-mcp-server/
 ├── .env.example                   # Env vars
 └── README.md
 ```
-
 
 ## 🚨 Troubleshooting
 
@@ -291,7 +416,25 @@ curl http://localhost:8100/health
 # Check individual components
 curl http://localhost:8101/api/v2/heartbeat  # ChromaDB
 curl http://localhost:9100/minio/health/live # MinIO
+curl http://localhost:8080/health            # Nginx
 ```
+
+**Common Issues:**
+
+1. **Cannot access documents (404 error)**
+   - Verify Nginx is running: `docker compose ps nginx`
+   - Check Nginx logs: `docker compose logs nginx`
+   - Ensure `MINIO_SERVER_URL` matches your `NGINX_PORT`
+
+2. **MinIO connection refused**
+   - Verify MinIO is running: `docker compose ps minio`
+   - Check MinIO logs: `docker compose logs minio`
+   - Ensure bucket policy is set correctly (check application logs during startup)
+
+3. **Documents not loading in browser**
+   - Check if URL format is correct: `http://localhost:8080/minio/documents/...`
+   - Verify bucket policy: Access MinIO console at `http://localhost:9101` and check bucket permissions
+   - Review Nginx proxy configuration in `nginx/conf.d/default.conf`
 
 ## 🤝 Contributing
 

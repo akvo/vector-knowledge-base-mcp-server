@@ -9,6 +9,7 @@ from app.core.security import get_api_key
 from app.models.api_key import APIKey
 from app.models.knowledge import KnowledgeBase
 from app.services.kb_service import KnowledgeBaseService
+from app.services.document_service import DocumentService
 from app.api.v1.knowledge_base.schema import (
     KnowledgeBaseCreate,
     KnowledgeBaseUpdate,
@@ -100,6 +101,12 @@ def get_knowledge_bases(
     if not with_documents:
         for kb in items:
             kb.documents = []  # avoids lazy loading
+    else:
+        for kb in items:
+            doc_service = DocumentService(kb_id=kb.id, db=db)
+            for doc in kb.documents:
+                url = doc_service._build_direct_url(file_path=doc.file_path)
+                setattr(doc, "file_url", url)
 
     # Return simple list
     if not include_total:
@@ -146,7 +153,11 @@ def get_knowledge_base(
     # If skipping documents, force empty list (not lazy-loaded)
     if not with_documents:
         kb.documents = []
-
+    else:
+        doc_service = DocumentService(kb_id=kb.id, db=db)
+        for doc in kb.documents:
+            url = doc_service._build_direct_url(file_path=doc.file_path)
+            setattr(doc, "file_url", url)
     return kb
 
 

@@ -95,6 +95,14 @@ async def list_kb_documents(
     # Get paginated items
     items = query.offset(skip).limit(limit).all()
 
+    # inject URL + file info into each Document ORM output
+    service = DocumentService(kb_id, db)
+
+    for doc in items:
+        url = service._build_direct_url(doc.file_path)
+        # Dynamically attach extra fields without schema change
+        setattr(doc, "file_url", url)
+
     # If no pagination wrapper requested → return plain list
     if not include_total:
         return items

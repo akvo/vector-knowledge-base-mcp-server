@@ -295,6 +295,8 @@ class DocumentService:
         )
         if not doc:
             raise HTTPException(status_code=404, detail="Document not found")
+        url = self._build_direct_url(doc.file_path)
+        setattr(doc, "file_url", url)
         return doc
 
     def search(self, query: str, top_k: int = 5):
@@ -446,6 +448,15 @@ class DocumentService:
             "minio_deleted": minio_deleted,
         }
 
+    def _build_direct_url(self, file_path: str) -> str:
+        # Create direct URL through Nginx proxy
+        # (no signature needed with public bucket)
+        # Format: http://localhost:8080/minio/BUCKET/OBJECT_PATH
+        base = f"{settings.minio_server_url}/{settings.minio_bucket_name}"
+        url = f"{base}/{file_path}"
+        logger.info(f"Generated direct URL: {url}")
+        return url
+
     async def get_presigned_file_info(self, doc_id: int):
         doc = (
             self.db.query(Document)
@@ -472,24 +483,16 @@ class DocumentService:
 
         file_name = doc.file_name if doc else upload.file_name
         file_path = doc.file_path if doc else upload.temp_path
-
-        # Create direct URL through Nginx proxy
-        # (no signature needed with public bucket)
-        # Format: http://localhost:8080/minio/BUCKET/OBJECT_PATH
-        url = f"{settings.minio_server_url}/{settings.minio_bucket_name}"
-        url = f"{url}/{file_path}"
-
-        logger.info(f"Generated direct URL: {url}")
-
+        url = self._build_direct_url(file_path)
         file_info = get_file_info(file_name)
 
         return {
             "document_id": doc_id,
             "file_name": file_name,
-            "file_path": doc.file_path,
+            "file_path": file_path,
             "file_type": file_info["mime_type"],
             "file_extension": file_info["file_extension"],
-            "url": url,
+            "file_url": url,
             "is_viewable_in_browser": file_info["is_viewable_in_browser"],
             "source": "documents" if doc else "document_uploads",
         }

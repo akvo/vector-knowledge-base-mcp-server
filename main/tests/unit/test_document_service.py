@@ -455,8 +455,7 @@ class TestDocumentService:
             f"{settings.minio_bucket_name}/"
             f"kb_{kb.id}/documents/file.pdf"
         )
-        assert result["url"] == expected_prefix
-
+        assert result["file_url"] == expected_prefix
         assert result["file_name"] == "file.pdf"
         assert result["document_id"] == doc.id
 

@@ -136,7 +136,7 @@ class TestDocumentViewAndDeleteRoutes:
         data = res.json()
 
         # Expected response: presigned URL details
-        assert "url" in data
+        assert "file_url" in data
 
     async def test_view_document_not_found(
         self, app: FastAPI, client: AsyncClient, api_key_value: str

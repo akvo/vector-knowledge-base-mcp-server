@@ -54,6 +54,7 @@ class ProcessingTask(ProcessingTaskBase):
 class DocumentResponse(DocumentBase):
     id: int
     knowledge_base_id: int
+    file_url: str
     created_at: datetime
     updated_at: datetime
     processing_tasks: Optional[List[ProcessingTask]] = None

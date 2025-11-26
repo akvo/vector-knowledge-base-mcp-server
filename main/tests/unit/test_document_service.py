@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from unittest.mock import MagicMock
 from starlette.background import BackgroundTasks
 from datetime import datetime, timedelta
+from sqlalchemy import and_
 
 from app.models.knowledge import (
     KnowledgeBase,
@@ -454,7 +455,177 @@ class TestDocumentService:
             f"{settings.minio_bucket_name}/"
             f"kb_{kb.id}/documents/file.pdf"
         )
-        assert result["file_path"] == expected_prefix
+        assert result["url"] == expected_prefix
 
         assert result["file_name"] == "file.pdf"
         assert result["document_id"] == doc.id
+
+    async def test_delete_document_cleans_processing_tasks(self, session):
+        kb = KnowledgeBase(name="KB", description="test")
+        session.add(kb)
+        session.commit()
+
+        # Create document
+        doc = Document(
+            knowledge_base_id=kb.id,
+            file_name="file.pdf",
+            file_path="kb_1/documents/file.pdf",
+            content_type="application/pdf",
+            file_size=10,
+            file_hash="HASH123",
+        )
+        session.add(doc)
+        session.commit()
+
+        # Create processing task linked to document
+        task = ProcessingTask(
+            knowledge_base_id=kb.id, document_id=doc.id, status="completed"
+        )
+        session.add(task)
+        session.commit()
+
+        # Ensure task exists before deletion
+        assert (
+            session.query(ProcessingTask)
+            .filter(
+                and_(
+                    ProcessingTask.knowledge_base_id == kb.id,
+                    ProcessingTask.document_id == doc.id,
+                )
+            )
+            .count()
+            == 1
+        )
+
+        # Delete the document
+        session.delete(doc)
+        session.commit()
+
+        # Task should now be deleted automatically
+        remaining = (
+            session.query(ProcessingTask)
+            .filter(
+                and_(
+                    ProcessingTask.knowledge_base_id == kb.id,
+                    ProcessingTask.document_id == doc.id,
+                )
+            )
+            .count()
+        )
+        assert remaining == 0
+
+    async def test_delete_document_upload_cleans_processing_tasks(
+        self, session
+    ):
+        kb = KnowledgeBase(name="KB", description="upload-test")
+        session.add(kb)
+        session.commit()
+
+        upload = DocumentUpload(
+            knowledge_base_id=kb.id,
+            file_name="temp.pdf",
+            temp_path="kb_1/temp/temp.pdf",
+            file_hash="UPLOAD123",
+            file_size=10,
+            content_type="application/pdf",
+        )
+        session.add(upload)
+        session.commit()
+
+        task = ProcessingTask(
+            knowledge_base_id=kb.id,
+            document_upload_id=upload.id,
+            status="pending",
+        )
+        session.add(task)
+        session.commit()
+
+        assert (
+            session.query(ProcessingTask)
+            .filter(
+                and_(
+                    ProcessingTask.knowledge_base_id == kb.id,
+                    ProcessingTask.document_upload_id == upload.id,
+                )
+            )
+            .count()
+            == 1
+        )
+
+        # Delete the upload
+        session.delete(upload)
+        session.commit()
+
+        assert (
+            session.query(ProcessingTask)
+            .filter(
+                and_(
+                    ProcessingTask.knowledge_base_id == kb.id,
+                    ProcessingTask.document_upload_id == upload.id,
+                )
+            )
+            .count()
+            == 0
+        )
+
+    async def test_delete_kb_cleans_all_processing_tasks(self, session):
+        kb = KnowledgeBase(name="KB", description="cascade-test")
+        session.add(kb)
+        session.commit()
+
+        # Create document + upload
+        doc = Document(
+            knowledge_base_id=kb.id,
+            file_name="doc.pdf",
+            file_path="kb_1/documents/doc.pdf",
+            file_hash="HASHKB",
+            content_type="application/pdf",
+            file_size=10,
+        )
+        session.add(doc)
+        session.commit()
+
+        upload = DocumentUpload(
+            knowledge_base_id=kb.id,
+            file_name="temp.pdf",
+            temp_path="kb_1/temp/temp.pdf",
+            file_hash="UPLOADKB",
+            file_size=10,
+            content_type="application/pdf",
+        )
+        session.add(upload)
+        session.commit()
+
+        # Two tasks: one for doc, one for upload
+        t1 = ProcessingTask(
+            knowledge_base_id=kb.id, document_id=doc.id, status="completed"
+        )
+        t2 = ProcessingTask(
+            knowledge_base_id=kb.id,
+            document_upload_id=upload.id,
+            status="pending",
+        )
+        session.add_all([t1, t2])
+        session.commit()
+
+        assert (
+            session.query(ProcessingTask)
+            .filter(
+                ProcessingTask.knowledge_base_id == kb.id,
+            )
+            .count()
+            == 2
+        )
+
+        # Delete the knowledge base
+        session.delete(kb)
+        session.commit()
+
+        assert (
+            session.query(ProcessingTask)
+            .filter(
+                ProcessingTask.knowledge_base_id == kb.id,
+            )
+            .count()
+            == 0
+        )

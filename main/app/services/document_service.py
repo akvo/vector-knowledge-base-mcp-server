@@ -428,7 +428,7 @@ class DocumentService:
                     document_id=doc.id
                 ).delete()
                 self.db.delete(doc)
-            elif upload:
+            if upload:
                 self.db.delete(upload)
             self.db.commit()
         except Exception as e:
@@ -486,9 +486,10 @@ class DocumentService:
         return {
             "document_id": doc_id,
             "file_name": file_name,
-            "file_path": url,
+            "file_path": doc.file_path,
             "file_type": file_info["mime_type"],
             "file_extension": file_info["file_extension"],
+            "url": url,
             "is_viewable_in_browser": file_info["is_viewable_in_browser"],
             "source": "documents" if doc else "document_uploads",
         }

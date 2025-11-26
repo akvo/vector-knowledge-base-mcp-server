@@ -377,6 +377,17 @@ class DocumentService:
                     status_code=404, detail="Document not found"
                 )
 
+        # if doc found use file_hash to check the document_uploads record
+        if doc and doc.file_hash:
+            upload = (
+                self.db.query(DocumentUpload)
+                .filter(
+                    DocumentUpload.file_hash == doc.file_hash,
+                    DocumentUpload.knowledge_base_id == self.kb_id,
+                )
+                .first()
+            )
+
         # Permission validation
         if user and not user.is_admin:
             raise HTTPException(

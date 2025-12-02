@@ -73,6 +73,7 @@ class DocumentService:
                     {
                         "document_id": existing.id,
                         "file_name": existing.file_name,
+                        "file_size": existing.file_size,
                         "status": "exists",
                         "message": "Document already exists",
                         "skip_processing": True,
@@ -187,6 +188,7 @@ class DocumentService:
                     "upload_id": upload.id,
                     "file_name": clean_filename,
                     "temp_path": temp_path,
+                    "file_size": len(file_content),
                     "status": "pending",
                     "skip_processing": False,
                 }
@@ -282,6 +284,7 @@ class DocumentService:
                 "upload_id": t.document_upload_id,
                 "temp_path": uploads_dict[t.document_upload_id].temp_path,
                 "file_name": uploads_dict[t.document_upload_id].file_name,
+                "file_size": uploads_dict[t.document_upload_id].file_size,
             }
             for t in tasks
         ]
@@ -295,14 +298,16 @@ class DocumentService:
         }
 
     async def _enqueue_processing(self, task_data: List[dict]):
+        await asyncio.sleep(0.3)
         for data in task_data:
             asyncio.create_task(
                 process_document_background(
-                    data["temp_path"],
-                    data["file_name"],
-                    self.kb_id,
-                    data["task_id"],
-                    None,
+                    temp_path=data["temp_path"],
+                    file_name=data["file_name"],
+                    file_size=data["file_size"],
+                    kb_id=self.kb_id,
+                    task_id=data["task_id"],
+                    db=None,
                 )
             )
         logger.info(

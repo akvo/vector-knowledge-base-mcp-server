@@ -52,10 +52,15 @@ class DocumentService:
             file_content = await file.read()
             file_hash = hashlib.sha256(file_content).hexdigest()
 
+            # Get clean filename
+            clean_filename = "".join(
+                c for c in file.filename if c.isalnum() or c in ("-", "_", ".")
+            ).strip()
+
             existing = (
                 self.db.query(Document)
                 .filter(
-                    Document.file_name == file.filename,
+                    Document.file_name == clean_filename,
                     Document.file_hash == file_hash,
                     Document.knowledge_base_id == self.kb_id,
                 )
@@ -73,29 +78,47 @@ class DocumentService:
                 )
                 continue
 
-            temp_path = f"kb_{self.kb_id}/temp/{file.filename}"
+            # Use clean filename for temp path
+            temp_path = f"kb_{self.kb_id}/temp/{clean_filename}"
             await file.seek(0)
+
             try:
                 minio_client = get_minio_client()
+
+                # CRITICAL: Ensure we're uploading bytes, not file object
+                from io import BytesIO
+
+                data_stream = BytesIO(file_content)
+
                 minio_client.put_object(
                     bucket_name=settings.minio_bucket_name,
                     object_name=temp_path,
-                    data=file.file,
+                    data=data_stream,
                     length=len(file_content),
-                    content_type=file.content_type,
+                    content_type=file.content_type
+                    or "application/octet-stream",
                 )
+
+                # Verify the upload was successful
+                logger.info(
+                    f"MinIO success upload {clean_filename} to  {temp_path}"
+                )
+
             except MinioException as e:
-                logger.error(f"MinIO upload failed: {str(e)}")
+                logger.error(
+                    f"MinIO upload failed for {clean_filename}: {str(e)}"
+                )
                 raise HTTPException(
-                    status_code=500, detail="Failed to upload file"
+                    status_code=500,
+                    detail=f"Failed to upload file {clean_filename}: {str(e)}",
                 )
 
             upload = DocumentUpload(
                 knowledge_base_id=self.kb_id,
-                file_name=file.filename,
+                file_name=clean_filename,
                 file_hash=file_hash,
                 file_size=len(file_content),
-                content_type=file.content_type,
+                content_type=file.content_type or "application/octet-stream",
                 temp_path=temp_path,
             )
             self.db.add(upload)
@@ -105,7 +128,7 @@ class DocumentService:
             results.append(
                 {
                     "upload_id": upload.id,
-                    "file_name": file.filename,
+                    "file_name": clean_filename,
                     "temp_path": temp_path,
                     "status": "pending",
                     "skip_processing": False,

@@ -194,4 +194,6 @@ class TestUploadKBDocuments:
         )
 
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert response.json() == {"detail": "Failed to upload file"}
+        assert response.json() == {
+            "detail": "Failed to upload file err.txt: S3 operation failed; code: 500, message: MinIO down, resource: upload, request_id: req-123, host_id: host-123"  # noqa
+        }

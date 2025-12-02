@@ -86,6 +86,7 @@ async def list_kb_documents(
     List documents belonging to a Knowledge Base.
     Supports pagination, search, and optional total wrapping.
     """
+    # TODO:: when fetch documents, please also check to document_uploads table
     query = db.query(Document).filter(Document.knowledge_base_id == kb_id)
 
     if search:

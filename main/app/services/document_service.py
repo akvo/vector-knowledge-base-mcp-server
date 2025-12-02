@@ -1,7 +1,9 @@
 import logging
 import hashlib
 import asyncio
+import time
 
+from io import BytesIO
 from datetime import datetime, timedelta
 from typing import List, Dict
 from fastapi import HTTPException, UploadFile, BackgroundTasks
@@ -80,29 +82,84 @@ class DocumentService:
 
             # Use clean filename for temp path
             temp_path = f"kb_{self.kb_id}/temp/{clean_filename}"
-            await file.seek(0)
 
             try:
                 minio_client = get_minio_client()
 
-                # CRITICAL: Ensure we're uploading bytes, not file object
-                from io import BytesIO
-
+                # Use BytesIO for upload
                 data_stream = BytesIO(file_content)
+                content_type = file.content_type or "application/octet-stream"
+
+                logger.info(
+                    f"Uploading {clean_filename} to MinIO "
+                    f"(size: {len(file_content)} bytes)"
+                )
 
                 minio_client.put_object(
                     bucket_name=settings.minio_bucket_name,
                     object_name=temp_path,
                     data=data_stream,
                     length=len(file_content),
-                    content_type=file.content_type
-                    or "application/octet-stream",
+                    content_type=content_type,
                 )
 
-                # Verify the upload was successful
-                logger.info(
-                    f"MinIO success upload {clean_filename} to  {temp_path}"
-                )
+                # ✅ IMPROVED: Verify upload with better error handling
+                verified = False
+                max_attempts = 5
+
+                for attempt in range(max_attempts):
+                    try:
+                        # Just check if object exists and has correct size
+                        stat = minio_client.stat_object(
+                            bucket_name=settings.minio_bucket_name,
+                            object_name=temp_path,
+                        )
+
+                        if stat.size == len(file_content):
+                            logger.info(
+                                f"✓ MinIO upload verified: {clean_filename} "
+                                f"({stat.size} bytes)"
+                            )
+                            verified = True
+                            break
+                        else:
+                            logger.warning(
+                                f"Size mismatch (attempt {attempt + 1}/{max_attempts}): "  # noqa
+                                f"expected {len(file_content)}, got {stat.size}"  # noqa
+                            )
+
+                    except Exception as e:
+                        logger.warning(
+                            f"Verification attempt {attempt + 1}/{max_attempts} failed: {e}"  # noqa
+                        )
+
+                    # Don't wait on last attempt
+                    if attempt < max_attempts - 1:
+                        time.sleep(
+                            0.05 * (attempt + 1)
+                        )  # 50ms, 100ms, 150ms, 200ms
+
+                if not verified:
+                    logger.error(
+                        f"Upload verification failed for {clean_filename} "
+                        f"after {max_attempts} attempts"
+                    )
+                    # Try to clean up
+                    try:
+                        minio_client.remove_object(
+                            bucket_name=settings.minio_bucket_name,
+                            object_name=temp_path,
+                        )
+                    except Exception as e:
+                        logger.error(f"Error cleanup minio {e}")
+                        pass
+
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            f"Upload verification failed for {clean_filename}"
+                        ),
+                    )
 
             except MinioException as e:
                 logger.error(
@@ -118,7 +175,7 @@ class DocumentService:
                 file_name=clean_filename,
                 file_hash=file_hash,
                 file_size=len(file_content),
-                content_type=file.content_type or "application/octet-stream",
+                content_type=content_type,
                 temp_path=temp_path,
             )
             self.db.add(upload)

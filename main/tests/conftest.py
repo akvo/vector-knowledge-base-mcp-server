@@ -136,9 +136,6 @@ def api_key_value(session: Session) -> str:
     return api_key.key
 
 
-# -------------------------------
-# Global mocks for external services
-# -------------------------------
 @pytest.fixture
 def patch_external_services(monkeypatch, tmp_path):
     """
@@ -161,16 +158,92 @@ def patch_external_services(monkeypatch, tmp_path):
     # ---------- MinIO mock ----------
     mock_minio = MagicMock()
 
+    # Track uploaded files for stat_object
+    uploaded_files = {}
+
+    def mock_put_object(*args, **kwargs):
+        """Track uploaded files"""
+        object_name = kwargs.get("object_name") or args[1]
+        length = kwargs.get("length") or args[3]
+        data = kwargs.get("data") or args[2]
+
+        # Read data to get actual length if it's a BytesIO
+        if hasattr(data, "read"):
+            content = data.read()
+            actual_length = len(content)
+            data.seek(0)  # Reset for potential re-reads
+        else:
+            actual_length = length
+
+        # Store file info
+        uploaded_files[object_name] = {
+            "size": actual_length,
+            "etag": "mock-etag",
+        }
+        return None
+
+    def mock_stat_object(*args, **kwargs):
+        """Return stats for uploaded files"""
+        bucket_name = kwargs.get("bucket_name") or args[0]  # noqa
+        object_name = kwargs.get("object_name") or args[1]
+
+        if object_name in uploaded_files:
+            # Create a mock stat object
+            stat = MagicMock()
+            stat.size = uploaded_files[object_name]["size"]
+            stat.etag = uploaded_files[object_name]["etag"]
+            stat.last_modified = MagicMock()
+            return stat
+        else:
+            # Simulate file not found
+            from minio.error import S3Error
+
+            raise S3Error(
+                code="NoSuchKey",
+                message="Object not found",
+                resource=object_name,
+                request_id="test",
+                host_id="test",
+                response=MagicMock(status=404),
+            )
+
     def mock_fget_object(*args, **kwargs):
         file_path = kwargs.get("file_path") or args[2]
+        object_name = kwargs.get("object_name") or args[1]
+
+        # Create dummy file with proper content
         dummy_file = tmp_path / "test.txt"
-        dummy_file.write_text("dummy content")
+
+        # If we have size info, create file with that size
+        if object_name in uploaded_files:
+            size = uploaded_files[object_name]["size"]
+            dummy_file.write_bytes(b"x" * size)
+        else:
+            dummy_file.write_text("dummy content")
+
         dummy_file.rename(file_path)
 
+    def mock_get_object(*args, **kwargs):
+        """Mock get_object for readback verification"""
+        object_name = kwargs.get("object_name") or args[1]
+
+        # Create a mock response
+        response = MagicMock()
+        if object_name in uploaded_files:
+            size = uploaded_files[object_name]["size"]
+            response.read.return_value = b"x" * size
+        else:
+            response.read.return_value = b"dummy content"
+
+        return response
+
+    mock_minio.put_object.side_effect = mock_put_object
+    mock_minio.stat_object.side_effect = mock_stat_object
     mock_minio.fget_object.side_effect = mock_fget_object
-    mock_minio.put_object.return_value = None
+    mock_minio.get_object.side_effect = mock_get_object
     mock_minio.copy_object.return_value = None
     mock_minio.remove_object.return_value = None
+
     monkeypatch.setattr(
         document_processor, "get_minio_client", lambda: mock_minio
     )
@@ -268,6 +341,7 @@ def patch_external_services(monkeypatch, tmp_path):
         "mock_embeddings": mock_embeddings,
         "mock_vector_store": mock_vs,
         "mock_preview": mock_preview,
+        "uploaded_files": uploaded_files,  # Expose for test assertions
     }
 
 

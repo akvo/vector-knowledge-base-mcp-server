@@ -1,7 +1,10 @@
+import os
+import re
 import logging
 import hashlib
 import asyncio
 
+from io import BytesIO
 from datetime import datetime, timedelta
 from typing import List, Dict
 from fastapi import HTTPException, UploadFile, BackgroundTasks
@@ -26,6 +29,19 @@ from app.services.processing_task_service import ProcessingTaskService
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def make_clean_filename(filename: str) -> str:
+    name, ext = os.path.splitext(filename)
+    # Replace ., -, spaces with _
+    name = re.sub(r"[.\-\s]", "_", name)
+    # Remove everything not alphanumeric or underscore
+    name = re.sub(r"[^A-Za-z0-9_]", "", name)
+    # Replace multiple underscores with a single one
+    name = re.sub(r"_+", "_", name)
+    # Remove leading/trailing underscores
+    name = name.strip("_")
+    return f"{name}{ext.lower()}"
 
 
 class DocumentService:
@@ -53,9 +69,7 @@ class DocumentService:
             file_hash = hashlib.sha256(file_content).hexdigest()
 
             # Get clean filename
-            clean_filename = "".join(
-                c for c in file.filename if c.isalnum() or c in ("-", "_", ".")
-            ).strip()
+            clean_filename = file.filename  # revert, don't use cleanfilename
 
             existing = (
                 self.db.query(Document)
@@ -71,6 +85,7 @@ class DocumentService:
                     {
                         "document_id": existing.id,
                         "file_name": existing.file_name,
+                        "file_size": existing.file_size,
                         "status": "exists",
                         "message": "Document already exists",
                         "skip_processing": True,
@@ -80,29 +95,63 @@ class DocumentService:
 
             # Use clean filename for temp path
             temp_path = f"kb_{self.kb_id}/temp/{clean_filename}"
-            await file.seek(0)
 
             try:
                 minio_client = get_minio_client()
 
-                # CRITICAL: Ensure we're uploading bytes, not file object
-                from io import BytesIO
-
+                # Use BytesIO for upload
                 data_stream = BytesIO(file_content)
+                content_type = file.content_type or "application/octet-stream"
+
+                logger.info(
+                    f"Uploading {clean_filename} to MinIO "
+                    f"(size: {len(file_content)} bytes)"
+                )
 
                 minio_client.put_object(
                     bucket_name=settings.minio_bucket_name,
                     object_name=temp_path,
                     data=data_stream,
                     length=len(file_content),
-                    content_type=file.content_type
-                    or "application/octet-stream",
+                    content_type=content_type,
                 )
 
-                # Verify the upload was successful
-                logger.info(
-                    f"MinIO success upload {clean_filename} to  {temp_path}"
-                )
+                # Simple, safe MinIO verification
+                verified = False
+                max_attempts = 5
+
+                for attempt in range(max_attempts):
+                    try:
+                        stat = minio_client.stat_object(
+                            bucket_name=settings.minio_bucket_name,
+                            object_name=temp_path,
+                        )
+
+                        if stat.size == len(file_content):
+                            logger.info(
+                                f"✓ MinIO upload verified: {clean_filename} ({stat.size} bytes)"  # noqa
+                            )
+                            verified = True
+                            break
+                        else:
+                            logger.warning(
+                                f"[Verify] Size mismatch (attempt {attempt+1}/{max_attempts}): "  # noqa
+                                f"expected {len(file_content)}, got {stat.size}"  # noqa
+                            )
+
+                    except Exception as e:
+                        logger.warning(
+                            f"[Verify] Attempt {attempt+1}/{max_attempts} failed: {e}"  # noqa
+                        )
+
+                    await asyncio.sleep(0.05 * (attempt + 1))
+
+                if not verified:
+                    # ❗ Do NOT raise errors and do NOT delete file
+                    logger.warning(
+                        f"[Verify] MinIO upload not fully verified for {clean_filename}. "  # noqa
+                        "Proceeding anyway; downloader will perform its own safety checks."  # noqa
+                    )
 
             except MinioException as e:
                 logger.error(
@@ -118,7 +167,7 @@ class DocumentService:
                 file_name=clean_filename,
                 file_hash=file_hash,
                 file_size=len(file_content),
-                content_type=file.content_type or "application/octet-stream",
+                content_type=content_type,
                 temp_path=temp_path,
             )
             self.db.add(upload)
@@ -130,6 +179,7 @@ class DocumentService:
                     "upload_id": upload.id,
                     "file_name": clean_filename,
                     "temp_path": temp_path,
+                    "file_size": len(file_content),
                     "status": "pending",
                     "skip_processing": False,
                 }
@@ -225,6 +275,7 @@ class DocumentService:
                 "upload_id": t.document_upload_id,
                 "temp_path": uploads_dict[t.document_upload_id].temp_path,
                 "file_name": uploads_dict[t.document_upload_id].file_name,
+                "file_size": uploads_dict[t.document_upload_id].file_size,
             }
             for t in tasks
         ]
@@ -238,14 +289,16 @@ class DocumentService:
         }
 
     async def _enqueue_processing(self, task_data: List[dict]):
+        await asyncio.sleep(0.3)
         for data in task_data:
             asyncio.create_task(
                 process_document_background(
-                    data["temp_path"],
-                    data["file_name"],
-                    self.kb_id,
-                    data["task_id"],
-                    None,
+                    temp_path=data["temp_path"],
+                    file_name=data["file_name"],
+                    file_size=data["file_size"],
+                    kb_id=self.kb_id,
+                    task_id=data["task_id"],
+                    db=None,
                 )
             )
         logger.info(

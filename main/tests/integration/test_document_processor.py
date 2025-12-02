@@ -112,6 +112,7 @@ class TestDocumentProcessor:
         await document_processor.process_document_background(
             temp_path="tmp/test.txt",
             file_name="test.txt",
+            file_size=10,
             kb_id=1,
             task_id=999,
             db=session,

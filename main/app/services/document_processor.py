@@ -306,30 +306,30 @@ async def process_document_background(
         logger.error(f"Task {task_id} not found")
         return
 
+    logger.info(f"Task {task_id}: Setting status to processing")
+    task.status = "processing"
+    db.commit()
+
+    # 1. Ensure temp file exists in MinIO and download it
+    minio_client = get_minio_client()
+
+    # --- MinIO write stabilization ---
     try:
-        logger.info(f"Task {task_id}: Setting status to processing")
-        task.status = "processing"
-        db.commit()
-
-        # 1. Ensure temp file exists in MinIO and download it
-        minio_client = get_minio_client()
-
-        # --- MinIO write stabilization ---
-        try:
+        await asyncio.sleep(0.2)
+        for _ in range(3):
+            stat = minio_client.stat_object(
+                settings.minio_bucket_name, temp_path
+            )
+            # only enforce size check if expected_size exists
+            if file_size is None and stat.size >= file_size:
+                break
             await asyncio.sleep(0.2)
-            for _ in range(3):
-                stat = minio_client.stat_object(
-                    settings.minio_bucket_name, temp_path
-                )
-                # only enforce size check if expected_size exists
-                if file_size is None and stat.size >= file_size:
-                    break
-                await asyncio.sleep(0.2)
-        except Exception:
-            # Do NOT fail task here — only fail if fget_object also fails
-            pass
-        # --- end stabilization ---
+    except Exception:
+        # Do NOT fail task here — only fail if fget_object also fails
+        pass
+    # --- end stabilization ---
 
+    try:
         try:
             local_temp_path = f"/tmp/{task_id}_{uuid.uuid4().hex}_{file_name}"
 

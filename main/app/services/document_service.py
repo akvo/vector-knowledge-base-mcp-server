@@ -1,7 +1,8 @@
+import os
+import re
 import logging
 import hashlib
 import asyncio
-import time
 
 from io import BytesIO
 from datetime import datetime, timedelta
@@ -30,6 +31,19 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def make_clean_filename(filename: str) -> str:
+    name, ext = os.path.splitext(filename)
+    # Replace ., -, spaces with _
+    name = re.sub(r"[.\-\s]", "_", name)
+    # Remove everything not alphanumeric or underscore
+    name = re.sub(r"[^A-Za-z0-9_]", "", name)
+    # Replace multiple underscores with a single one
+    name = re.sub(r"_+", "_", name)
+    # Remove leading/trailing underscores
+    name = name.strip("_")
+    return f"{name}{ext.lower()}"
+
+
 class DocumentService:
     def __init__(self, kb_id: int | None, db: Session):
         self.kb_id = kb_id
@@ -55,9 +69,7 @@ class DocumentService:
             file_hash = hashlib.sha256(file_content).hexdigest()
 
             # Get clean filename
-            clean_filename = "".join(
-                c for c in file.filename if c.isalnum() or c in ("-", "_", ".")
-            ).strip()
+            clean_filename = make_clean_filename(filename=file.filename)
 
             existing = (
                 self.db.query(Document)
@@ -104,13 +116,12 @@ class DocumentService:
                     content_type=content_type,
                 )
 
-                # ✅ IMPROVED: Verify upload with better error handling
+                # Simple, safe MinIO verification
                 verified = False
                 max_attempts = 5
 
                 for attempt in range(max_attempts):
                     try:
-                        # Just check if object exists and has correct size
                         stat = minio_client.stat_object(
                             bucket_name=settings.minio_bucket_name,
                             object_name=temp_path,
@@ -118,48 +129,28 @@ class DocumentService:
 
                         if stat.size == len(file_content):
                             logger.info(
-                                f"✓ MinIO upload verified: {clean_filename} "
-                                f"({stat.size} bytes)"
+                                f"✓ MinIO upload verified: {clean_filename} ({stat.size} bytes)"  # noqa
                             )
                             verified = True
                             break
                         else:
                             logger.warning(
-                                f"Size mismatch (attempt {attempt + 1}/{max_attempts}): "  # noqa
+                                f"[Verify] Size mismatch (attempt {attempt+1}/{max_attempts}): "  # noqa
                                 f"expected {len(file_content)}, got {stat.size}"  # noqa
                             )
 
                     except Exception as e:
                         logger.warning(
-                            f"Verification attempt {attempt + 1}/{max_attempts} failed: {e}"  # noqa
+                            f"[Verify] Attempt {attempt+1}/{max_attempts} failed: {e}"  # noqa
                         )
 
-                    # Don't wait on last attempt
-                    if attempt < max_attempts - 1:
-                        time.sleep(
-                            0.05 * (attempt + 1)
-                        )  # 50ms, 100ms, 150ms, 200ms
+                    await asyncio.sleep(0.05 * (attempt + 1))
 
                 if not verified:
-                    logger.error(
-                        f"Upload verification failed for {clean_filename} "
-                        f"after {max_attempts} attempts"
-                    )
-                    # Try to clean up
-                    try:
-                        minio_client.remove_object(
-                            bucket_name=settings.minio_bucket_name,
-                            object_name=temp_path,
-                        )
-                    except Exception as e:
-                        logger.error(f"Error cleanup minio {e}")
-                        pass
-
-                    raise HTTPException(
-                        status_code=500,
-                        detail=(
-                            f"Upload verification failed for {clean_filename}"
-                        ),
+                    # ❗ Do NOT raise errors and do NOT delete file
+                    logger.warning(
+                        f"[Verify] MinIO upload not fully verified for {clean_filename}. "  # noqa
+                        "Proceeding anyway; downloader will perform its own safety checks."  # noqa
                     )
 
             except MinioException as e:

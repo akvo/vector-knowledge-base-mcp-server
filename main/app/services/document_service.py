@@ -69,7 +69,7 @@ class DocumentService:
             file_hash = hashlib.sha256(file_content).hexdigest()
 
             # Get clean filename
-            clean_filename = make_clean_filename(filename=file.filename)
+            clean_filename = file.filename  # revert, don't use cleanfilename
 
             existing = (
                 self.db.query(Document)

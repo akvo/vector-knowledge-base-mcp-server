@@ -483,7 +483,7 @@ class DocumentService:
                     collection_name=f"kb_{self.kb_id}",
                     embedding_function=EmbeddingsFactory.create(),
                 )
-                vector_store.delete(filter={"document_id": str(document_id)})
+                vector_store.delete(filter={"document_id": document_id})
                 chroma_deleted = True
             except Exception as e:
                 logger.warning(

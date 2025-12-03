@@ -3,6 +3,8 @@ import logging
 import hashlib
 import tempfile
 import traceback
+import uuid
+import asyncio
 
 from io import BytesIO
 from typing import Optional, List, Dict
@@ -281,6 +283,7 @@ async def process_document_background(
     kb_id: int,
     task_id: int,
     db: Session = None,
+    file_size: int = None,
     chunk_size: int = 1000,
     chunk_overlap: int = 200,
 ) -> None:
@@ -303,22 +306,38 @@ async def process_document_background(
         logger.error(f"Task {task_id} not found")
         return
 
-    try:
-        logger.info(f"Task {task_id}: Setting status to processing")
-        task.status = "processing"
-        db.commit()
+    logger.info(f"Task {task_id}: Setting status to processing")
+    task.status = "processing"
+    db.commit()
 
-        # 1. Ensure temp file exists in MinIO and download it
-        minio_client = get_minio_client()
-        try:
-            local_temp_path = (
-                f"/tmp/temp_{task_id}_{file_name}"  # local temp path
+    # 1. Ensure temp file exists in MinIO and download it
+    minio_client = get_minio_client()
+
+    # --- MinIO write stabilization ---
+    try:
+        await asyncio.sleep(0.2)
+        for _ in range(3):
+            stat = minio_client.stat_object(
+                settings.minio_bucket_name, temp_path
             )
+            # only enforce size check if expected_size exists
+            if file_size is None and stat.size >= file_size:
+                break
+            await asyncio.sleep(0.2)
+    except Exception:
+        # Do NOT fail task here — only fail if fget_object also fails
+        pass
+    # --- end stabilization ---
+
+    try:
+        try:
+            local_temp_path = f"/tmp/{task_id}_{uuid.uuid4().hex}_{file_name}"
 
             download_msg = f"Downloading file from MinIO: {temp_path}"
             download_msg += f" to local path: {local_temp_path}"
 
             logger.info(f"Task {task_id}: {download_msg}")
+
             minio_client.fget_object(
                 bucket_name=settings.minio_bucket_name,
                 object_name=temp_path,

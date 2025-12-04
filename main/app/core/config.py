@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
     minio_bucket_name: str = "documents"
+    minio_server_url: str = "http://localhost:80/minio"
 
     # Chroma DB settings
     chroma_db_host: str = "localhost"

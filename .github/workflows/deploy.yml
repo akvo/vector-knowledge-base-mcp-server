@@ -64,6 +64,14 @@ jobs:
           path: composite-actions
           ref: 0.0.10
 
+      # - name: Docker Build Nginx
+      #   uses: ./composite-actions/.github/actions/docker-build
+      #   with:
+      #     app-name: ${{ steps.env.outputs.app_name }}
+      #     service-name: "nginx"
+      #     dockerfile-location: "nginx/Dockerfile"
+      #     cluster-name: "test"
+
       - name: Docker Build Main App
         uses: ./composite-actions/.github/actions/docker-build
         with:
@@ -79,6 +87,14 @@ jobs:
           service-name: "script"
           dockerfile-location: "script/Dockerfile"
           cluster-name: "test"
+
+      # - name: Docker Push Nginx
+      #   uses: ./composite-actions/.github/actions/docker-push
+      #   with:
+      #     app-name: ${{ steps.env.outputs.app_name }}
+      #     service-name: "nginx"
+      #     gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
+      #     cluster-name: "test"
 
       - name: Docker Push Main App
         uses: ./composite-actions/.github/actions/docker-push
@@ -145,6 +161,16 @@ jobs:
           token: ${{ secrets.GH_PAT }}
           path: composite-actions
           ref: 0.0.10
+
+      # - name: Rollout Nginx
+      #   uses: ./composite-actions/.github/actions/k8s-rollout
+      #   with:
+      #     app-name: ${{ steps.env.outputs.app_name }}
+      #     deployment-name: "nginx-deployment"
+      #     container-name: "nginx"
+      #     cluster-name: "test"
+      #     namespace-name: ${{ steps.env.outputs.namespace_name }}
+      #     gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
 
       - name: Rollout Main App
         uses: ./composite-actions/.github/actions/k8s-rollout

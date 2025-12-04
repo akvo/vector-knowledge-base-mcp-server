@@ -1,7 +1,7 @@
 services:
-  nginx:
-    ports: !override
-      - "${NGINX_PORT:-8080}:80"
+  # nginx:
+  #   ports: !override
+  #     - "${NGINX_PORT:-8080}:80"
 
   main:
     volumes:

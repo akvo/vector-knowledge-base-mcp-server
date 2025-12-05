@@ -47,7 +47,9 @@ def cleanup_kb_task(self, kb_id: int, task_id: int = None):
         return {"kb_id": kb_id, "status": "deleted"}
 
     except Exception as e:
-        processing_task_service.mark_failed(task_id=task_id)
+        processing_task_service.mark_failed(
+            task_id=task_id, error_message=str(e)
+        )
 
         attempt = self.request.retries + 1
         delay = min(300, 20 * (2**attempt))  # exponential backoff

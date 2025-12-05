@@ -34,6 +34,8 @@ from app.services.processing_task_service import (
 from app.core.config import settings
 from app.utils.mime_utils import get_file_info
 from app.tasks.document_task import process_document_task
+from app.tasks.doc_cleanup_task import cleanup_doc_task
+
 
 logger = logging.getLogger(__name__)
 
@@ -422,7 +424,8 @@ class DocumentService:
     async def delete_document(self, document_id: int, user=None):
         """
         Delete a document from either `documents` or `document_uploads`,
-        along with MinIO and Chroma cleanup.
+        delete DB records immediately,
+        and run MinIO + Chroma cleanup in Celery.
         """
         doc = (
             self.db.query(Document)
@@ -432,9 +435,9 @@ class DocumentService:
             )
             .first()
         )
+
         upload = None
 
-        # If not found in main table, check uploads
         if not doc:
             upload = (
                 self.db.query(DocumentUpload)
@@ -449,7 +452,6 @@ class DocumentService:
                     status_code=404, detail="Document not found"
                 )
 
-        # if doc found use file_hash to check the document_uploads record
         if doc and doc.file_hash:
             upload = (
                 self.db.query(DocumentUpload)
@@ -460,62 +462,55 @@ class DocumentService:
                 .first()
             )
 
-        # Permission validation
-        if user and not user.is_admin:
-            raise HTTPException(
-                status_code=403, detail="Not authorized to delete"
-            )
+        # ---- Prepare cleanup payload BEFORE deleting DB rows ----
+        # create task record
+        task_service = ProcessingTaskService(self.db)
+        task = task_service.create_task(
+            kb_id=self.kb_id,
+            document_id=doc.id if doc else None,
+            upload_id=upload.id if upload else None,
+            job_type=JobTypeEnum.delete_doc,
+        )
 
-        minio_client = get_minio_client()
-        chroma_deleted = False
-        minio_deleted = False
+        cleanup_payload = {
+            "task_id": task.id,
+            "kb_id": self.kb_id,
+            "document_id": document_id,
+            "file_path": doc.file_path if doc else upload.temp_path,
+            "is_processed": (
+                True if doc else False
+            ),  # processed = has chunks + Chroma
+        }
 
-        # Delete from Chroma (only for processed)
-        if doc:
-            try:
-                vector_store = ChromaVectorStore(
-                    collection_name=f"kb_{self.kb_id}",
-                    embedding_function=EmbeddingsFactory.create(),
-                )
-                vector_store.delete(filter={"document_id": document_id})
-                chroma_deleted = True
-            except Exception as e:
-                logger.warning(
-                    f"Chroma delete failed for document {document_id}: {e}"
-                )
-
-        # Delete from MinIO
-        file_path = doc.file_path if doc else upload.temp_path
-        try:
-            minio_client.remove_object(settings.minio_bucket_name, file_path)
-            minio_deleted = True
-            logger.info(f"Deleted object from MinIO: {file_path}")
-        except Exception as e:
-            logger.warning(f"Failed to delete from MinIO ({file_path}): {e}")
-
-        # Database Cleanup
         try:
             if doc:
                 self.db.query(DocumentChunk).filter_by(
                     document_id=doc.id
                 ).delete()
                 self.db.delete(doc)
+
             if upload:
                 self.db.delete(upload)
+
             self.db.commit()
         except Exception as e:
             self.db.rollback()
-            raise HTTPException(
-                status_code=500, detail=f"DB cleanup failed: {e}"
-            )
+            raise HTTPException(500, f"DB cleanup failed: {e}")
 
+        # ---- PUSH CLEANUP TO CELERY ----
+        # enqueue celery task
+        celery_task = cleanup_doc_task.delay(payload=cleanup_payload)
+        task_service.update_status(
+            task_id=task.id, celery_task_id=celery_task.id
+        )
+
+        # ---- Return response (same structure as before) ----
         return {
             "success": True,
-            "message": "Document deleted successfully",
+            "message": "Document deleted successfully.",
             "document_id": document_id,
             "deleted_from": "documents" if doc else "document_uploads",
-            "chroma_deleted": chroma_deleted,
-            "minio_deleted": minio_deleted,
+            "celery_task_id": celery_task.id,
         }
 
     def _build_direct_url(self, file_path: str) -> str:

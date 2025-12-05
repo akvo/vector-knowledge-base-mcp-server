@@ -310,7 +310,7 @@ class TestDocumentService:
             assert doc_data["content_type"] == doc.content_type
 
     async def test_delete_document_success(
-        self, session, patch_external_services, mocker
+        self, session, patch_external_services, mocker, mock_celery
     ):
         kb = KnowledgeBase(name="KB Del", description="delete test")
         session.add(kb)
@@ -328,22 +328,16 @@ class TestDocumentService:
         session.add(doc)
         session.commit()
 
-        mock_minio = patch_external_services["mock_minio"]
-        mock_vector_store = patch_external_services["mock_vector_store"]
-
         service = DocumentService(kb.id, session)
 
         result = await service.delete_document(doc.id, user=None)
 
-        # Ensure deletions happened
-        mock_minio.remove_object.assert_called_once()
-        mock_vector_store.delete.assert_called_once()
-
         assert result["success"]
         assert result["document_id"] == doc.id
+        assert result["celery_task_id"] is not None
 
     async def test_delete_document_uses_file_hash(
-        self, session, patch_external_services, mocker
+        self, session, patch_external_services, mocker, mock_celery
     ):
         kb = KnowledgeBase(name="KB Delete Hash", description="hash test")
         session.add(kb)
@@ -373,25 +367,16 @@ class TestDocumentService:
         session.add(upload)
         session.commit()
 
-        mock_minio = patch_external_services["mock_minio"]
-        _ = patch_external_services["mock_vector_store"]
-
         service = DocumentService(kb.id, session)
 
         # Run delete
         result = await service.delete_document(doc.id)
 
-        # Ensure DocumentUpload was found using file_hash
-        # (i.e., temp_path was deleted)
-        mock_minio.remove_object.assert_called_with(
-            settings.minio_bucket_name, "kb_1/documents/doc.txt"
-        )
-
         assert result["success"] is True
         assert result["deleted_from"] == "documents"
 
     async def test_delete_upload_when_document_not_found(
-        self, session, patch_external_services
+        self, session, patch_external_services, mock_celery
     ):
         kb = KnowledgeBase(name="KB Del Upload", description="delete upload")
         session.add(kb)
@@ -409,20 +394,9 @@ class TestDocumentService:
         session.add(upload)
         session.commit()
 
-        mock_minio = patch_external_services["mock_minio"]
-        mock_vector = patch_external_services["mock_vector_store"]
-
         service = DocumentService(kb.id, session)
 
         result = await service.delete_document(upload.id)
-
-        # Should delete temp file
-        mock_minio.remove_object.assert_called_with(
-            settings.minio_bucket_name, "kb_1/temp/upload.txt"
-        )
-
-        # Should NOT touch Chroma (because not processed)
-        mock_vector.delete.assert_not_called()
 
         assert result["deleted_from"] == "document_uploads"
         assert result["success"] is True

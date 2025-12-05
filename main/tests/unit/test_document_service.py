@@ -1,7 +1,7 @@
 import pytest
 
 from fastapi import HTTPException
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta
 from sqlalchemy import and_
 
@@ -118,8 +118,9 @@ class TestDocumentService:
         assert isinstance(preview, PreviewResult)
         assert preview.total_chunks == 2  # comes from patch_external_services
 
+    @patch("app.services.document_service.process_document_task.delay")
     async def test_process_documents_creates_tasks(
-        self, session, patch_external_services
+        self, mock_delay, session, patch_external_services, mock_celery
     ):
         kb = KnowledgeBase(name="KB Proc", description="proc test")
         session.add(kb)

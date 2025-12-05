@@ -1,1 +1,1 @@
-from app.tasks import document_task  # noqa
+from app.tasks import document_task, kb_cleanup_task  # noqa

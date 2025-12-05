@@ -19,6 +19,8 @@ from app.api.v1.knowledge_base.schema import (
 
 from app.mcp.mcp_main import mcp
 from app.mcp.resources.kb_resources import load_kb_resources
+from app.tasks.kb_cleanup_task import cleanup_kb_task
+from app.services.processing_task_service import ProcessingTaskService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -190,7 +192,29 @@ def update_knowledge_base(
 async def delete_knowledge_base(
     kb_id: int,
     db: Session = Depends(get_session),
-    api_key: APIKey = Depends(get_api_key),
+    api_key=Depends(get_api_key),
 ):
     service = KnowledgeBaseService(db)
-    return await service.delete_kb(kb_id)
+    processing_task_service = ProcessingTaskService(db)
+
+    # ensure KB exists
+    service.get_kb_by_id(kb_id=kb_id)
+
+    # create processing task record
+    task = processing_task_service.create_task(kb_id=kb_id)
+
+    # delete DB record only
+    service.delete_kb_record_only(kb_id=kb_id)
+
+    # schedule async cleanup
+    celery_task = cleanup_kb_task.delay(kb_id=kb_id, task_id=task.id)
+    logger.info(f"Scheduled KB cleanup task {celery_task.id} for KB {kb_id}")
+
+    processing_task_service.update_status(
+        task_id=task.id, status="pending", celery_task_id=celery_task.id
+    )
+
+    return {
+        "message": "Knowledge base deleted. Cleanup scheduled.",
+        "kb_id": kb_id,
+    }

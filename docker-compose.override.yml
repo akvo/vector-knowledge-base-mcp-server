@@ -22,7 +22,8 @@ services:
 
   rabbitmq:
     ports: !override
-      - "${RABBITMQ_MGMT_PORT:-15673}:15672"  # mgmt UI port override
+      - "5673:5672"
+      - "15673:15672"  # mgmt UI port override
 
   flower:
     ports: !override

@@ -15,12 +15,6 @@ celery_app.conf.update(
     accept_content=["json"],
     timezone="Asia/Jakarta",
     enable_utc=True,
-    beat_schedule={
-        "heartbeat-every-10-sec": {
-            "task": "app.tasks.schedule.heartbeat",
-            "schedule": 10.0,
-        },
-    },
 )
 
 celery_app.autodiscover_tasks(["app.tasks"])

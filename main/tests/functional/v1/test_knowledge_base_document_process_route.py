@@ -33,10 +33,10 @@ class TestProcessDocumentsRoute:
         assert res.status_code == 401
         assert res.json()["detail"] == "API key required"
 
-    @patch("app.services.document_service.DocumentService._enqueue_processing")
+    @patch("app.tasks.document_task.process_document_task.delay")
     async def test_process_documents_success(
         self,
-        mock_add_queue,
+        mock_delay,
         app: FastAPI,
         session: Session,
         client: AsyncClient,
@@ -77,12 +77,12 @@ class TestProcessDocumentsRoute:
         assert task.status == "pending"
 
         # background task must be queued
-        assert mock_add_queue.called
+        assert mock_delay.called
 
-    @patch("app.services.document_service.DocumentService._enqueue_processing")
+    @patch("app.tasks.document_task.process_document_task.delay")
     async def test_process_documents_skip_processing(
         self,
-        mock_add_queue,
+        mock_delay,
         app: FastAPI,
         session: Session,
         client: AsyncClient,
@@ -114,7 +114,7 @@ class TestProcessDocumentsRoute:
         assert response.status_code == 200
         data = response.json()
         assert data["tasks"] == []
-        assert not mock_add_queue.called
+        assert not mock_delay.called
 
     async def test_process_documents_kb_not_found(
         self,

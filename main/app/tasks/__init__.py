@@ -1,1 +1,1 @@
-from app.tasks import example, schedule  # noqa
+from app.tasks import document_task  # noqa

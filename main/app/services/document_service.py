@@ -7,7 +7,7 @@ import asyncio
 from io import BytesIO
 from datetime import datetime, timedelta
 from typing import List, Dict
-from fastapi import HTTPException, UploadFile, BackgroundTasks
+from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session, selectinload
 from minio.error import MinioException
 
@@ -25,12 +25,12 @@ from app.services.embedding_factory import EmbeddingsFactory
 from app.services.chromadb_service import ChromaVectorStore
 from app.services.document_processor import (
     preview_document,
-    process_document_background,
     PreviewResult,
 )
 from app.services.processing_task_service import ProcessingTaskService
 from app.core.config import settings
 from app.utils.mime_utils import get_file_info
+from app.tasks.document_task import process_document_task
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +233,9 @@ class DocumentService:
         return results
 
     async def process_documents(
-        self, upload_results: List[dict], background_tasks: BackgroundTasks
+        self,
+        upload_results: List[dict],
+        # background_tasks: BackgroundTasks
     ):
         kb = (
             self.db.query(KnowledgeBase)
@@ -268,18 +270,16 @@ class DocumentService:
                 task = task_service.create_task(self.kb_id, uid)
                 tasks.append(task)
 
-        # enqueue background processing
-        task_data = [
-            {
-                "task_id": t.id,
-                "upload_id": t.document_upload_id,
-                "temp_path": uploads_dict[t.document_upload_id].temp_path,
-                "file_name": uploads_dict[t.document_upload_id].file_name,
-                "file_size": uploads_dict[t.document_upload_id].file_size,
-            }
-            for t in tasks
-        ]
-        background_tasks.add_task(self._enqueue_processing, task_data)
+        for task in tasks:
+            upload = uploads_dict[task.document_upload_id]
+            # celery tasks
+            process_document_task.delay(
+                kb_id=self.kb_id,
+                task_id=task.id,
+                temp_path=upload.temp_path,
+                file_name=upload.file_name,
+                file_size=upload.file_size,
+            )
 
         return {
             "tasks": [
@@ -287,23 +287,6 @@ class DocumentService:
                 for t in tasks
             ]
         }
-
-    async def _enqueue_processing(self, task_data: List[dict]):
-        await asyncio.sleep(0.3)
-        for data in task_data:
-            asyncio.create_task(
-                process_document_background(
-                    temp_path=data["temp_path"],
-                    file_name=data["file_name"],
-                    file_size=data["file_size"],
-                    kb_id=self.kb_id,
-                    task_id=data["task_id"],
-                    db=None,
-                )
-            )
-        logger.info(
-            f"Queued {len(task_data)} processing tasks for KB {self.kb_id}"
-        )
 
     async def cleanup_temp_files(self):
         expired_time = datetime.utcnow() - timedelta(hours=24)

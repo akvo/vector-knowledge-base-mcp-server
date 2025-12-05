@@ -2,7 +2,6 @@ import pytest
 
 from fastapi import HTTPException
 from unittest.mock import MagicMock
-from starlette.background import BackgroundTasks
 from datetime import datetime, timedelta
 from sqlalchemy import and_
 
@@ -139,16 +138,13 @@ class TestDocumentService:
 
         service = DocumentService(kb.id, session)
 
-        background = BackgroundTasks()
         upload_results = [
             {"upload_id": upload.id, "file_name": upload.file_name}
         ]
-        result = await service.process_documents(upload_results, background)
+        result = await service.process_documents(upload_results)
 
         assert "tasks" in result
         assert result["tasks"][0]["upload_id"] == upload.id
-        # Background task should be scheduled
-        assert background.tasks
 
     async def test_cleanup_temp_files(self, session, patch_external_services):
         kb = KnowledgeBase(name="KB Clean", description="clean test")

@@ -33,7 +33,7 @@ class TestProcessDocumentsRoute:
         assert res.status_code == 401
         assert res.json()["detail"] == "API key required"
 
-    @patch("app.tasks.document_task.process_document_task.delay")
+    @patch("app.services.document_service.process_document_task.delay")
     async def test_process_documents_success(
         self,
         mock_delay,
@@ -41,6 +41,7 @@ class TestProcessDocumentsRoute:
         session: Session,
         client: AsyncClient,
         api_key_value: str,
+        mock_celery,
     ):
         """Process route should create tasks for uploads"""
         kb = KnowledgeBase(name="KB Proc", description="desc")
@@ -79,7 +80,7 @@ class TestProcessDocumentsRoute:
         # background task must be queued
         assert mock_delay.called
 
-    @patch("app.tasks.document_task.process_document_task.delay")
+    @patch("app.services.document_service.process_document_task.delay")
     async def test_process_documents_skip_processing(
         self,
         mock_delay,
@@ -87,6 +88,7 @@ class TestProcessDocumentsRoute:
         session: Session,
         client: AsyncClient,
         api_key_value: str,
+        mock_celery,
     ):
         """Skip processing should return empty tasks"""
         kb = KnowledgeBase(name="KB Skip", description="desc")

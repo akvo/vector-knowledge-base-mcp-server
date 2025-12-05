@@ -235,7 +235,6 @@ class DocumentService:
     async def process_documents(
         self,
         upload_results: List[dict],
-        # background_tasks: BackgroundTasks
     ):
         kb = (
             self.db.query(KnowledgeBase)

@@ -460,3 +460,20 @@ def patch_document_service(monkeypatch):
 
     monkeypatch.setattr(router_module, "DocumentService", mock_class)
     return mock_instance
+
+
+# Celery/rabbitmq mocking fixture
+@pytest.fixture
+def mock_celery(monkeypatch):
+    """Mock all Celery task invocations so RabbitMQ is never used."""
+    from app.tasks import document_task
+
+    # General fake task wrapper
+    class FakeTask:
+        def delay(self, *a, **kw):
+            return MagicMock(task_id="fake-task-id")
+
+        def apply_async(self, *a, **kw):
+            return MagicMock(task_id="fake-task-id")
+
+    monkeypatch.setattr(document_task, "process_document_task", FakeTask())

@@ -39,7 +39,7 @@ class ProcessingTaskService:
     def update_status(
         self,
         task_id: int,
-        status: str,
+        status: str = "pending",
         error_message: str = None,
         celery_task_id: str = None,
     ):

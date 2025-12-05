@@ -12,6 +12,7 @@ class TestKnowledgeBaseE2E:
         mcp_client,
         patch_external_services,
         api_key_value,
+        mock_celery,
     ):
         """
         End-to-end flow:

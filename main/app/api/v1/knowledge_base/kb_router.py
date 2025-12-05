@@ -211,7 +211,7 @@ async def delete_knowledge_base(
     logger.info(f"Scheduled KB cleanup task {celery_task.id} for KB {kb_id}")
 
     processing_task_service.update_status(
-        task_id=task.id, status="pending", celery_task_id=celery_task.id
+        task_id=task.id, celery_task_id=celery_task.id
     )
 
     return {

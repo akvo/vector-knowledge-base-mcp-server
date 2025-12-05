@@ -272,12 +272,17 @@ class DocumentService:
         for task in tasks:
             upload = uploads_dict[task.document_upload_id]
             # celery tasks
-            process_document_task.delay(
+            celery_task = process_document_task.delay(
                 kb_id=self.kb_id,
                 task_id=task.id,
                 temp_path=upload.temp_path,
                 file_name=upload.file_name,
                 file_size=upload.file_size,
+            )
+            # update task with celery ID
+            task_service.update_status(
+                task_id=task.id,
+                celery_task_id=celery_task.id,
             )
 
         return {

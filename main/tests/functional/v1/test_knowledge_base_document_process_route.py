@@ -44,6 +44,9 @@ class TestProcessDocumentsRoute:
         mock_celery,
     ):
         """Process route should create tasks for uploads"""
+        # Return a real string as Celery task ID
+        mock_delay.return_value.id = "fake-celery-task-id-222"
+
         kb = KnowledgeBase(name="KB Proc", description="desc")
         session.add(kb)
         session.commit()
@@ -76,6 +79,7 @@ class TestProcessDocumentsRoute:
         assert task is not None
         assert task.document_upload_id == upload.id
         assert task.status == "pending"
+        assert task.celery_task_id == "fake-celery-task-id-222"
 
         # background task must be queued
         assert mock_delay.called
@@ -91,6 +95,8 @@ class TestProcessDocumentsRoute:
         mock_celery,
     ):
         """Skip processing should return empty tasks"""
+        mock_delay.return_value.id = "fake-celery-task-id-223"
+
         kb = KnowledgeBase(name="KB Skip", description="desc")
         session.add(kb)
         session.commit()

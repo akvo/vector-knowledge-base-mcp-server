@@ -122,6 +122,7 @@ class TestDocumentService:
     async def test_process_documents_creates_tasks(
         self, mock_delay, session, patch_external_services, mock_celery
     ):
+        mock_delay.return_value.id = "fake-celery-task-id-321"
         kb = KnowledgeBase(name="KB Proc", description="proc test")
         session.add(kb)
         session.commit()

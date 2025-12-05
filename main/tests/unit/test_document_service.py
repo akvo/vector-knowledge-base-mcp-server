@@ -3,7 +3,6 @@ import pytest
 from fastapi import HTTPException
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta
-from sqlalchemy import and_
 
 from app.models.knowledge import (
     KnowledgeBase,

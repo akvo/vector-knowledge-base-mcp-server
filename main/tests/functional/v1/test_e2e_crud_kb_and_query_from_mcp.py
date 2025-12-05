@@ -1,12 +1,17 @@
 import io
 import pytest
+from unittest.mock import patch
 
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
 class TestKnowledgeBaseE2E:
+    @patch("app.services.document_service.process_document_task.delay")
+    @patch("app.api.v1.knowledge_base.kb_router.cleanup_kb_task.delay")
     async def test_full_flow(
         self,
+        mock_process_delay,
+        mock_cleanup_delay,
         app,
         client,
         mcp_client,
@@ -24,6 +29,10 @@ class TestKnowledgeBaseE2E:
         - Query KB via MCP
         - Delete KB
         """
+        # Return a real string as Celery task ID
+        mock_process_delay.return_value.id = "fake-celery-task-id-777"
+        mock_cleanup_delay.return_value.id = "fake-celery-task-id-888"
+
         headers = {"Authorization": f"API-Key {api_key_value}"}
 
         # 1. Create KB

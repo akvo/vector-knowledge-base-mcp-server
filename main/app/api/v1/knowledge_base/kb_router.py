@@ -20,7 +20,10 @@ from app.api.v1.knowledge_base.schema import (
 from app.mcp.mcp_main import mcp
 from app.mcp.resources.kb_resources import load_kb_resources
 from app.tasks.kb_cleanup_task import cleanup_kb_task
-from app.services.processing_task_service import ProcessingTaskService
+from app.services.processing_task_service import (
+    ProcessingTaskService,
+    JobTypeEnum,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -201,7 +204,9 @@ async def delete_knowledge_base(
     service.get_kb_by_id(kb_id=kb_id)
 
     # create processing task record
-    task = processing_task_service.create_task(kb_id=kb_id)
+    task = processing_task_service.create_task(
+        kb_id=kb_id, job_type=JobTypeEnum.delete_kb
+    )
 
     # delete DB record only
     service.delete_kb_record_only(kb_id=kb_id)

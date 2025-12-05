@@ -64,6 +64,8 @@ class TestDeleteKnowledgeBase:
             .first()
         )
         assert task_record is not None
+        assert task_record.status == "pending"
+        assert task_record.job_type == "delete_kb"
 
     async def test_delete_kb_not_found(self, client, app, api_key_value):
         response = await client.delete(

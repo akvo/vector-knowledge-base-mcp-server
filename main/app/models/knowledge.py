@@ -157,6 +157,9 @@ class ProcessingTask(Base):
         String(50), default="pending"
     )  # pending, processing, completed, failed
     celery_task_id = Column(String(250), nullable=True)  # Celery task ID
+    job_type = Column(
+        String(100), nullable=True
+    )  # e.g., "delete_kb", "process_doc"
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(

@@ -1,10 +1,16 @@
 import logging
+import enum
 
 from sqlalchemy.orm import Session
 from app.models import ProcessingTask
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+
+class JobTypeEnum(str, enum.Enum):
+    delete_kb = "delete_kb"
+    process_doc = "process_doc"
 
 
 class ProcessingTaskService:
@@ -20,13 +26,18 @@ class ProcessingTaskService:
     # CREATE
     # -------------------------------
     def create_task(
-        self, kb_id: int, upload_id: int = None, celery_task_id: str = None
+        self,
+        kb_id: int,
+        job_type: JobTypeEnum,
+        upload_id: int = None,
+        celery_task_id: str = None,
     ) -> ProcessingTask:
         task = ProcessingTask(
             knowledge_base_id=kb_id,
             document_upload_id=upload_id,
             celery_task_id=celery_task_id,
             status="pending",
+            job_type=job_type.value,
         )
         self.db.add(task)
         self.db.commit()

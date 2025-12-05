@@ -27,7 +27,10 @@ from app.services.document_processor import (
     preview_document,
     PreviewResult,
 )
-from app.services.processing_task_service import ProcessingTaskService
+from app.services.processing_task_service import (
+    ProcessingTaskService,
+    JobTypeEnum,
+)
 from app.core.config import settings
 from app.utils.mime_utils import get_file_info
 from app.tasks.document_task import process_document_task
@@ -266,7 +269,11 @@ class DocumentService:
         tasks = []
         for uid in upload_ids:
             if uid in uploads_dict:
-                task = task_service.create_task(self.kb_id, uid)
+                task = task_service.create_task(
+                    kb_id=self.kb_id,
+                    upload_id=uid,
+                    job_type=JobTypeEnum.process_doc,
+                )
                 tasks.append(task)
 
         for task in tasks:

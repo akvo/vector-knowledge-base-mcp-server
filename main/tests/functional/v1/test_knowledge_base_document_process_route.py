@@ -80,6 +80,7 @@ class TestProcessDocumentsRoute:
         assert task.document_upload_id == upload.id
         assert task.status == "pending"
         assert task.celery_task_id == "fake-celery-task-id-222"
+        assert task.job_type == "process_doc"
 
         # background task must be queued
         assert mock_delay.called

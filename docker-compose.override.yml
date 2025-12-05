@@ -20,6 +20,18 @@ services:
       - 9100:9000 # API port
       - 9101:9001 # Console port
 
+  rabbitmq:
+    ports: !override
+      - "5673:5672"
+      - "15673:15672"  # mgmt UI port override
+
+  flower:
+    ports: !override
+      - "5556:5555"
+    depends_on:
+      - rabbitmq
+      - celery-worker
+
   pgadmin:
     image: dpage/pgadmin4:9.7.0
     environment:

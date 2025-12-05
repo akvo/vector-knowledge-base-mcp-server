@@ -1,5 +1,8 @@
 from app.models import KnowledgeBase, DocumentUpload, ProcessingTask
-from app.services.processing_task_service import ProcessingTaskService
+from app.services.processing_task_service import (
+    ProcessingTaskService,
+    JobTypeEnum,
+)
 
 
 class TestProcessingTaskService:
@@ -28,12 +31,15 @@ class TestProcessingTaskService:
         """Should create a new ProcessingTask with pending status"""
         kb, upload = self._create_kb_and_upload(session)
         service = ProcessingTaskService(session)
-        task = service.create_task(kb_id=kb.id, upload_id=upload.id)
+        task = service.create_task(
+            kb_id=kb.id, upload_id=upload.id, job_type=JobTypeEnum.process_doc
+        )
 
         assert task.id is not None
         assert task.knowledge_base_id == kb.id
         assert task.document_upload_id == upload.id
         assert task.status == "pending"
+        assert task.job_type == JobTypeEnum.process_doc.value
 
         db_task = session.query(ProcessingTask).get(task.id)
         assert db_task is not None
@@ -42,7 +48,9 @@ class TestProcessingTaskService:
         """Should update the task status and optional error message"""
         kb, upload = self._create_kb_and_upload(session)
         service = ProcessingTaskService(session)
-        task = service.create_task(kb.id, upload.id)
+        task = service.create_task(
+            kb_id=kb.id, upload_id=upload.id, job_type=JobTypeEnum.process_doc
+        )
 
         updated = service.update_status(task.id, "processing")
         assert updated.status == "processing"
@@ -57,7 +65,9 @@ class TestProcessingTaskService:
         """Should retrieve a specific ProcessingTask by id"""
         kb, upload = self._create_kb_and_upload(session)
         service = ProcessingTaskService(session)
-        created = service.create_task(kb.id, upload.id)
+        created = service.create_task(
+            kb_id=kb.id, upload_id=upload.id, job_type=JobTypeEnum.process_doc
+        )
 
         found = service.get_task(created.id)
         assert found is not None
@@ -71,7 +81,9 @@ class TestProcessingTaskService:
         """
         kb, upload = self._create_kb_and_upload(session)
         service = ProcessingTaskService(session)
-        created = service.create_task(kb.id, upload.id)
+        created = service.create_task(
+            kb_id=kb.id, upload_id=upload.id, job_type=JobTypeEnum.process_doc
+        )
 
         processing = service.mark_processing(created.id)
         assert processing.status == "processing"
@@ -89,9 +101,21 @@ class TestProcessingTaskService:
         kb2, upload2 = self._create_kb_and_upload(session)
         service = ProcessingTaskService(session)
 
-        service.create_task(kb1.id, upload1.id)
-        service.create_task(kb1.id, upload1.id)
-        service.create_task(kb2.id, upload2.id)
+        service.create_task(
+            kb_id=kb1.id,
+            upload_id=upload1.id,
+            job_type=JobTypeEnum.process_doc,
+        )
+        service.create_task(
+            kb_id=kb1.id,
+            upload_id=upload1.id,
+            job_type=JobTypeEnum.process_doc,
+        )
+        service.create_task(
+            kb_id=kb2.id,
+            upload_id=upload2.id,
+            job_type=JobTypeEnum.process_doc,
+        )
 
         tasks_kb1 = service.list_tasks(kb1.id)
         tasks_kb2 = service.list_tasks(kb2.id)

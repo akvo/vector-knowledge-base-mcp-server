@@ -1,10 +1,8 @@
 import pytest
 
 from fastapi import HTTPException
-from unittest.mock import MagicMock
-from starlette.background import BackgroundTasks
+from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta
-from sqlalchemy import and_
 
 from app.models.knowledge import (
     KnowledgeBase,
@@ -119,9 +117,11 @@ class TestDocumentService:
         assert isinstance(preview, PreviewResult)
         assert preview.total_chunks == 2  # comes from patch_external_services
 
+    @patch("app.services.document_service.process_document_task.delay")
     async def test_process_documents_creates_tasks(
-        self, session, patch_external_services
+        self, mock_delay, session, patch_external_services, mock_celery
     ):
+        mock_delay.return_value.id = "fake-celery-task-id-321"
         kb = KnowledgeBase(name="KB Proc", description="proc test")
         session.add(kb)
         session.commit()
@@ -139,16 +139,13 @@ class TestDocumentService:
 
         service = DocumentService(kb.id, session)
 
-        background = BackgroundTasks()
         upload_results = [
             {"upload_id": upload.id, "file_name": upload.file_name}
         ]
-        result = await service.process_documents(upload_results, background)
+        result = await service.process_documents(upload_results)
 
         assert "tasks" in result
         assert result["tasks"][0]["upload_id"] == upload.id
-        # Background task should be scheduled
-        assert background.tasks
 
     async def test_cleanup_temp_files(self, session, patch_external_services):
         kb = KnowledgeBase(name="KB Clean", description="clean test")
@@ -311,9 +308,13 @@ class TestDocumentService:
             assert doc_data["status"] == doc.status
             assert doc_data["content_type"] == doc.content_type
 
+    @patch("app.services.document_service.cleanup_doc_task.delay")
     async def test_delete_document_success(
-        self, session, patch_external_services, mocker
+        self, mock_delay, session, patch_external_services, mocker, mock_celery
     ):
+        # Return a real string as Celery task ID
+        mock_delay.return_value.id = "fake-celery-task-id-911"
+
         kb = KnowledgeBase(name="KB Del", description="delete test")
         session.add(kb)
         session.commit()
@@ -330,23 +331,21 @@ class TestDocumentService:
         session.add(doc)
         session.commit()
 
-        mock_minio = patch_external_services["mock_minio"]
-        mock_vector_store = patch_external_services["mock_vector_store"]
-
         service = DocumentService(kb.id, session)
 
         result = await service.delete_document(doc.id, user=None)
 
-        # Ensure deletions happened
-        mock_minio.remove_object.assert_called_once()
-        mock_vector_store.delete.assert_called_once()
-
         assert result["success"]
         assert result["document_id"] == doc.id
+        assert result["celery_task_id"] is not None
 
+    @patch("app.services.document_service.cleanup_doc_task.delay")
     async def test_delete_document_uses_file_hash(
-        self, session, patch_external_services, mocker
+        self, mock_delay, session, patch_external_services, mocker, mock_celery
     ):
+        # Return a real string as Celery task ID
+        mock_delay.return_value.id = "fake-celery-task-id-912"
+
         kb = KnowledgeBase(name="KB Delete Hash", description="hash test")
         session.add(kb)
         session.commit()
@@ -375,26 +374,21 @@ class TestDocumentService:
         session.add(upload)
         session.commit()
 
-        mock_minio = patch_external_services["mock_minio"]
-        _ = patch_external_services["mock_vector_store"]
-
         service = DocumentService(kb.id, session)
 
         # Run delete
         result = await service.delete_document(doc.id)
 
-        # Ensure DocumentUpload was found using file_hash
-        # (i.e., temp_path was deleted)
-        mock_minio.remove_object.assert_called_with(
-            settings.minio_bucket_name, "kb_1/documents/doc.txt"
-        )
-
         assert result["success"] is True
         assert result["deleted_from"] == "documents"
 
+    @patch("app.services.document_service.cleanup_doc_task.delay")
     async def test_delete_upload_when_document_not_found(
-        self, session, patch_external_services
+        self, mock_delay, session, patch_external_services, mock_celery
     ):
+        # Return a real string as Celery task ID
+        mock_delay.return_value.id = "fake-celery-task-id-913"
+
         kb = KnowledgeBase(name="KB Del Upload", description="delete upload")
         session.add(kb)
         session.commit()
@@ -411,20 +405,9 @@ class TestDocumentService:
         session.add(upload)
         session.commit()
 
-        mock_minio = patch_external_services["mock_minio"]
-        mock_vector = patch_external_services["mock_vector_store"]
-
         service = DocumentService(kb.id, session)
 
         result = await service.delete_document(upload.id)
-
-        # Should delete temp file
-        mock_minio.remove_object.assert_called_with(
-            settings.minio_bucket_name, "kb_1/temp/upload.txt"
-        )
-
-        # Should NOT touch Chroma (because not processed)
-        mock_vector.delete.assert_not_called()
 
         assert result["deleted_from"] == "document_uploads"
         assert result["success"] is True
@@ -458,173 +441,3 @@ class TestDocumentService:
         assert result["file_url"] == expected_prefix
         assert result["file_name"] == "file.pdf"
         assert result["document_id"] == doc.id
-
-    async def test_delete_document_cleans_processing_tasks(self, session):
-        kb = KnowledgeBase(name="KB", description="test")
-        session.add(kb)
-        session.commit()
-
-        # Create document
-        doc = Document(
-            knowledge_base_id=kb.id,
-            file_name="file.pdf",
-            file_path="kb_1/documents/file.pdf",
-            content_type="application/pdf",
-            file_size=10,
-            file_hash="HASH123",
-        )
-        session.add(doc)
-        session.commit()
-
-        # Create processing task linked to document
-        task = ProcessingTask(
-            knowledge_base_id=kb.id, document_id=doc.id, status="completed"
-        )
-        session.add(task)
-        session.commit()
-
-        # Ensure task exists before deletion
-        assert (
-            session.query(ProcessingTask)
-            .filter(
-                and_(
-                    ProcessingTask.knowledge_base_id == kb.id,
-                    ProcessingTask.document_id == doc.id,
-                )
-            )
-            .count()
-            == 1
-        )
-
-        # Delete the document
-        session.delete(doc)
-        session.commit()
-
-        # Task should now be deleted automatically
-        remaining = (
-            session.query(ProcessingTask)
-            .filter(
-                and_(
-                    ProcessingTask.knowledge_base_id == kb.id,
-                    ProcessingTask.document_id == doc.id,
-                )
-            )
-            .count()
-        )
-        assert remaining == 0
-
-    async def test_delete_document_upload_cleans_processing_tasks(
-        self, session
-    ):
-        kb = KnowledgeBase(name="KB", description="upload-test")
-        session.add(kb)
-        session.commit()
-
-        upload = DocumentUpload(
-            knowledge_base_id=kb.id,
-            file_name="temp.pdf",
-            temp_path="kb_1/temp/temp.pdf",
-            file_hash="UPLOAD123",
-            file_size=10,
-            content_type="application/pdf",
-        )
-        session.add(upload)
-        session.commit()
-
-        task = ProcessingTask(
-            knowledge_base_id=kb.id,
-            document_upload_id=upload.id,
-            status="pending",
-        )
-        session.add(task)
-        session.commit()
-
-        assert (
-            session.query(ProcessingTask)
-            .filter(
-                and_(
-                    ProcessingTask.knowledge_base_id == kb.id,
-                    ProcessingTask.document_upload_id == upload.id,
-                )
-            )
-            .count()
-            == 1
-        )
-
-        # Delete the upload
-        session.delete(upload)
-        session.commit()
-
-        assert (
-            session.query(ProcessingTask)
-            .filter(
-                and_(
-                    ProcessingTask.knowledge_base_id == kb.id,
-                    ProcessingTask.document_upload_id == upload.id,
-                )
-            )
-            .count()
-            == 0
-        )
-
-    async def test_delete_kb_cleans_all_processing_tasks(self, session):
-        kb = KnowledgeBase(name="KB", description="cascade-test")
-        session.add(kb)
-        session.commit()
-
-        # Create document + upload
-        doc = Document(
-            knowledge_base_id=kb.id,
-            file_name="doc.pdf",
-            file_path="kb_1/documents/doc.pdf",
-            file_hash="HASHKB",
-            content_type="application/pdf",
-            file_size=10,
-        )
-        session.add(doc)
-        session.commit()
-
-        upload = DocumentUpload(
-            knowledge_base_id=kb.id,
-            file_name="temp.pdf",
-            temp_path="kb_1/temp/temp.pdf",
-            file_hash="UPLOADKB",
-            file_size=10,
-            content_type="application/pdf",
-        )
-        session.add(upload)
-        session.commit()
-
-        # Two tasks: one for doc, one for upload
-        t1 = ProcessingTask(
-            knowledge_base_id=kb.id, document_id=doc.id, status="completed"
-        )
-        t2 = ProcessingTask(
-            knowledge_base_id=kb.id,
-            document_upload_id=upload.id,
-            status="pending",
-        )
-        session.add_all([t1, t2])
-        session.commit()
-
-        assert (
-            session.query(ProcessingTask)
-            .filter(
-                ProcessingTask.knowledge_base_id == kb.id,
-            )
-            .count()
-            == 2
-        )
-
-        # Delete the knowledge base
-        session.delete(kb)
-        session.commit()
-
-        assert (
-            session.query(ProcessingTask)
-            .filter(
-                ProcessingTask.knowledge_base_id == kb.id,
-            )
-            .count()
-            == 0
-        )

@@ -44,7 +44,9 @@ class KnowledgeBase(Base, TimestampMixin):
         cascade="all, delete-orphan",
     )
     processing_tasks = relationship(
-        "ProcessingTask", back_populates="knowledge_base"
+        "ProcessingTask",
+        back_populates="knowledge_base",
+        passive_deletes=True,
     )
 
 
@@ -73,7 +75,9 @@ class Document(Base, TimestampMixin):
         cascade="all, delete-orphan",
     )
     processing_tasks = relationship(
-        "ProcessingTask", back_populates="document"
+        "ProcessingTask",
+        back_populates="document",
+        passive_deletes=True,
     )
 
     __table_args__ = (
@@ -133,14 +137,29 @@ class ProcessingTask(Base):
     __tablename__ = "processing_tasks"
 
     id = Column(Integer, primary_key=True, index=True)
-    knowledge_base_id = Column(Integer, ForeignKey("knowledge_bases.id"))
-    document_id = Column(Integer, ForeignKey("documents.id"), nullable=True)
+    knowledge_base_id = Column(
+        Integer, ForeignKey("knowledge_bases.id", ondelete="SET NULL")
+    )
+    document_id = Column(
+        Integer,
+        ForeignKey("documents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     document_upload_id = Column(
-        Integer, ForeignKey("document_uploads.id"), nullable=True
+        Integer,
+        ForeignKey(
+            "document_uploads.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
     )
     status = Column(
         String(50), default="pending"
     )  # pending, processing, completed, failed
+    celery_task_id = Column(String(250), nullable=True)  # Celery task ID
+    job_type = Column(
+        String(100), nullable=True
+    )  # e.g., "delete_kb", "process_doc"
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(
@@ -148,9 +167,17 @@ class ProcessingTask(Base):
     )
 
     knowledge_base = relationship(
-        "KnowledgeBase", back_populates="processing_tasks"
+        "KnowledgeBase",
+        back_populates="processing_tasks",
+        passive_deletes=True,
     )
-    document = relationship("Document", back_populates="processing_tasks")
+    document = relationship(
+        "Document",
+        back_populates="processing_tasks",
+        passive_deletes=True,
+    )
     document_upload = relationship(
-        "DocumentUpload", backref="processing_tasks"
+        "DocumentUpload",
+        backref="processing_tasks",
+        passive_deletes=True,
     )

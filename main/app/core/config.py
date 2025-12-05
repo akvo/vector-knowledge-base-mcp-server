@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # Admin API Key
     admin_api_key: str = "your-admin-api-key-here"
 
+    # RABBITMQ SETTINGS
+    rabbitmq_host: str = "rabbitmq"
+    rabbitmq_port: int = 5672
+    rabbitmq_user: str = "rabbitmq"
+    rabbitmq_pass: str = "rabbitmq"
+
     @field_validator("database_url", mode="before")
     def escape_percent(cls, v: str) -> str:
         return v.replace("%", "%%") if v else v

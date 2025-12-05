@@ -1,9 +1,7 @@
 import pytest
 
-from minio.error import S3Error as MinioException
-
-from app.core.config import settings
-from app.models.knowledge import KnowledgeBase
+from unittest.mock import patch
+from app.models.knowledge import KnowledgeBase, ProcessingTask
 
 
 @pytest.mark.asyncio
@@ -29,23 +27,23 @@ class TestDeleteKnowledgeBase:
         assert res.status_code == 401
         assert res.json()["detail"] == "API key required"
 
+    @patch("app.api.v1.knowledge_base.kb_router.cleanup_kb_task.delay")
     async def test_delete_success(
         self,
+        mock_delay,
         client,
         app,
         session,
         api_key_value,
         patch_external_services,
     ):
+        # Return a real string as Celery task ID
+        mock_delay.return_value.id = "fake-celery-task-id-123"
+
         kb = KnowledgeBase(name="Test KB", description="A test KB")
         session.add(kb)
         session.commit()
         kb_id = kb.id
-
-        mock_minio = patch_external_services["mock_minio"]
-        mock_minio.list_objects.return_value = []
-
-        mock_vector = patch_external_services["mock_vector_store"]
 
         response = await client.delete(
             app.url_path_for("v1_delete_knowledge_base", kb_id=kb_id),
@@ -54,14 +52,20 @@ class TestDeleteKnowledgeBase:
 
         assert response.status_code == 200
         assert response.json() == {
-            "message": "KB and all associated resources deleted successfully"
+            "message": "Knowledge base deleted. Cleanup scheduled.",
+            "kb_id": kb_id,
         }
-
-        mock_minio.list_objects.assert_called_once_with(
-            settings.minio_bucket_name, prefix=f"kb_{kb_id}/"
-        )
-        mock_vector.delete_collection.assert_called_once()
+        assert mock_delay.called
         assert session.query(KnowledgeBase).filter_by(id=kb_id).first() is None
+        # Confirm that the DB now has the string, not MagicMock
+        task_record = (
+            session.query(ProcessingTask)
+            .filter(ProcessingTask.celery_task_id == "fake-celery-task-id-123")
+            .first()
+        )
+        assert task_record is not None
+        assert task_record.status == "pending"
+        assert task_record.job_type == "delete_kb"
 
     async def test_delete_kb_not_found(self, client, app, api_key_value):
         response = await client.delete(
@@ -70,98 +74,3 @@ class TestDeleteKnowledgeBase:
         )
         assert response.status_code == 404
         assert response.json() == {"detail": "Knowledge base not found"}
-
-    async def test_delete_minio_error(
-        self,
-        client,
-        app,
-        session,
-        api_key_value,
-        patch_external_services,
-    ):
-        kb = KnowledgeBase(name="Test KB 2", description="A test KB 2")
-        session.add(kb)
-        session.commit()
-        kb_id = kb.id
-
-        mock_minio = patch_external_services["mock_minio"]
-        mock_minio.list_objects.side_effect = MinioException(
-            code="500",
-            message="MinIO down",
-            resource="test-resource",
-            request_id="req-123",
-            host_id="host-123",
-            response=None,
-        )
-
-        response = await client.delete(
-            app.url_path_for("v1_delete_knowledge_base", kb_id=kb_id),
-            headers=self.get_headers(api_key_value),
-        )
-
-        assert response.status_code == 200
-        assert "warnings" in response.json()
-        assert "MinIO cleanup error" in response.json()["warnings"][0]
-        assert session.query(KnowledgeBase).filter_by(id=kb_id).first() is None
-
-    async def test_delete_chroma_error(
-        self,
-        client,
-        app,
-        session,
-        api_key_value,
-        patch_external_services,
-    ):
-        kb = KnowledgeBase(name="Test KB 3", description="A test KB 3")
-        session.add(kb)
-        session.commit()
-        kb_id = kb.id
-
-        mock_minio = patch_external_services["mock_minio"]
-        mock_minio.list_objects.return_value = []
-
-        mock_vector = patch_external_services["mock_vector_store"]
-        mock_vector.delete_collection.side_effect = Exception("Chroma down")
-
-        response = await client.delete(
-            app.url_path_for("v1_delete_knowledge_base", kb_id=kb_id),
-            headers=self.get_headers(api_key_value),
-        )
-
-        assert response.status_code == 200
-        assert "warnings" in response.json()
-        assert (
-            "Vector store cleanup failed: Chroma down"
-            in response.json()["warnings"][0]
-        )
-        assert session.query(KnowledgeBase).filter_by(id=kb_id).first() is None
-
-    async def test_delete_unexpected_exception(
-        self,
-        client,
-        app,
-        session,
-        api_key_value,
-        patch_external_services,
-    ):
-        kb = KnowledgeBase(name="Test KB 4", description="A test KB 4")
-        session.add(kb)
-        session.commit()
-        kb_id = kb.id
-
-        mock_minio = patch_external_services["mock_minio"]
-        mock_minio.list_objects.return_value = []
-        # simulate unexpected failure
-        mock_minio.list_objects.side_effect = RuntimeError("Unexpected error")
-
-        response = await client.delete(
-            app.url_path_for("v1_delete_knowledge_base", kb_id=kb_id),
-            headers=self.get_headers(api_key_value),
-        )
-
-        assert response.status_code == 200
-        assert "warnings" in response.json()
-        assert any(
-            "Unexpected error" in w for w in response.json()["warnings"]
-        )
-        assert session.query(KnowledgeBase).filter_by(id=kb_id).first() is None

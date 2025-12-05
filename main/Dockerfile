@@ -17,7 +17,9 @@ COPY migrations ./migrations
 
 # Copy scripts
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY entrypoint-celery.sh /entrypoint-celery.sh
+
+RUN chmod +x /entrypoint.sh /entrypoint-celery.sh
 
 COPY test.sh /test.sh
 RUN chmod +x /test.sh

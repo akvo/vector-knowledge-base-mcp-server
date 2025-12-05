@@ -1,7 +1,7 @@
 import logging
 
 from typing import List, Optional, Union, Dict, Any
-from fastapi import APIRouter, Depends, UploadFile, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, UploadFile, Query
 from sqlalchemy.orm import Session
 
 from app.db.connection import get_session
@@ -47,12 +47,11 @@ async def preview_kb_documents(
 async def process_kb_documents(
     kb_id: int,
     upload_results: List[dict],
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_session),
     api_key: APIKey = Depends(get_api_key),
 ):
     service = DocumentService(kb_id, db)
-    return await service.process_documents(upload_results, background_tasks)
+    return await service.process_documents(upload_results)
 
 
 @router.post("/cleanup", name="v1_cleanup_temp_files")

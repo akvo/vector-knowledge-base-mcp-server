@@ -4,7 +4,6 @@ from typing import List
 from fastapi import (
     APIRouter,
     UploadFile,
-    BackgroundTasks,
     Depends,
     HTTPException,
 )
@@ -27,7 +26,6 @@ router = APIRouter()
 async def full_process_documents(
     kb_id: int,
     files: List[UploadFile],
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_session),
     api_key: APIKey = Depends(get_api_key),
 ):
@@ -48,9 +46,7 @@ async def full_process_documents(
         upload_results = await doc_service.upload_documents(files)
 
         # 2️⃣ Process documents
-        return await doc_service.process_documents(
-            upload_results, background_tasks
-        )
+        return await doc_service.process_documents(upload_results)
 
     except HTTPException:
         # Re-raise FastAPI HTTPExceptions directly

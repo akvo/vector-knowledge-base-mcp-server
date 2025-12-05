@@ -33,16 +33,20 @@ class TestProcessDocumentsRoute:
         assert res.status_code == 401
         assert res.json()["detail"] == "API key required"
 
-    @patch("app.services.document_service.DocumentService._enqueue_processing")
+    @patch("app.services.document_service.process_document_task.delay")
     async def test_process_documents_success(
         self,
-        mock_add_queue,
+        mock_delay,
         app: FastAPI,
         session: Session,
         client: AsyncClient,
         api_key_value: str,
+        mock_celery,
     ):
         """Process route should create tasks for uploads"""
+        # Return a real string as Celery task ID
+        mock_delay.return_value.id = "fake-celery-task-id-222"
+
         kb = KnowledgeBase(name="KB Proc", description="desc")
         session.add(kb)
         session.commit()
@@ -75,20 +79,25 @@ class TestProcessDocumentsRoute:
         assert task is not None
         assert task.document_upload_id == upload.id
         assert task.status == "pending"
+        assert task.celery_task_id == "fake-celery-task-id-222"
+        assert task.job_type == "process_doc"
 
         # background task must be queued
-        assert mock_add_queue.called
+        assert mock_delay.called
 
-    @patch("app.services.document_service.DocumentService._enqueue_processing")
+    @patch("app.services.document_service.process_document_task.delay")
     async def test_process_documents_skip_processing(
         self,
-        mock_add_queue,
+        mock_delay,
         app: FastAPI,
         session: Session,
         client: AsyncClient,
         api_key_value: str,
+        mock_celery,
     ):
         """Skip processing should return empty tasks"""
+        mock_delay.return_value.id = "fake-celery-task-id-223"
+
         kb = KnowledgeBase(name="KB Skip", description="desc")
         session.add(kb)
         session.commit()
@@ -114,7 +123,7 @@ class TestProcessDocumentsRoute:
         assert response.status_code == 200
         data = response.json()
         assert data["tasks"] == []
-        assert not mock_add_queue.called
+        assert not mock_delay.called
 
     async def test_process_documents_kb_not_found(
         self,

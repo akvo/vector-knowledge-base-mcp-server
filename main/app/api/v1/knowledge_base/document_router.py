@@ -1,7 +1,7 @@
 import logging
 
 from typing import List, Optional, Union, Dict, Any
-from fastapi import APIRouter, Depends, UploadFile, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, UploadFile, Query
 from sqlalchemy.orm import Session
 
 from app.db.connection import get_session
@@ -47,12 +47,11 @@ async def preview_kb_documents(
 async def process_kb_documents(
     kb_id: int,
     upload_results: List[dict],
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_session),
     api_key: APIKey = Depends(get_api_key),
 ):
     service = DocumentService(kb_id, db)
-    return await service.process_documents(upload_results, background_tasks)
+    return await service.process_documents(upload_results)
 
 
 @router.post("/cleanup", name="v1_cleanup_temp_files")
@@ -86,6 +85,7 @@ async def list_kb_documents(
     List documents belonging to a Knowledge Base.
     Supports pagination, search, and optional total wrapping.
     """
+    # TODO:: when fetch documents, please also check to document_uploads table
     query = db.query(Document).filter(Document.knowledge_base_id == kb_id)
 
     if search:
@@ -94,6 +94,14 @@ async def list_kb_documents(
 
     # Get paginated items
     items = query.offset(skip).limit(limit).all()
+
+    # inject URL + file info into each Document ORM output
+    service = DocumentService(kb_id, db)
+
+    for doc in items:
+        url = service._build_direct_url(doc.file_path)
+        # Dynamically attach extra fields without schema change
+        setattr(doc, "file_url", url)
 
     # If no pagination wrapper requested → return plain list
     if not include_total:
@@ -154,3 +162,31 @@ async def get_document(
 ) -> Any:
     service = DocumentService(kb_id, db)
     return await service.get_document(doc_id)
+
+
+@router.get(
+    "/{kb_id}/documents/{document_id}/view",
+    name="v1_view_kb_document",
+)
+async def get_kb_document_file(
+    kb_id: int,
+    document_id: int,
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
+):
+    service = DocumentService(kb_id, db)
+    return await service.get_presigned_file_info(document_id)
+
+
+@router.delete(
+    "/{kb_id}/documents/{document_id}",
+    name="v1_delete_kb_document",
+)
+async def delete_kb_document(
+    kb_id: int,
+    document_id: int,
+    db: Session = Depends(get_session),
+    api_key: APIKey = Depends(get_api_key),
+):
+    service = DocumentService(kb_id, db)
+    return await service.delete_document(document_id)

@@ -72,9 +72,24 @@ class ChromaVectorStore:
             documents=documents,
         )
 
-    def delete(self, ids: List[str]) -> None:
-        """Delete documents or embeddings by their IDs."""
-        self._store.delete(ids)
+    def delete(
+        self,
+        ids: Optional[List[str]] = None,
+        filter: Optional[dict] = None,
+    ) -> None:
+        """Delete embeddings from Chroma by ID or metadata filter."""
+        try:
+            if ids:
+                self._store._collection.delete(ids=ids)
+                logger.info(f"Deleted {len(ids)} embeddings by IDs.")
+            elif filter:
+                self._store._collection.delete(where=filter)
+                logger.info(f"Deleted embeddings by filter: {filter}")
+            else:
+                logger.warning("No delete criteria provided (ids/filter).")
+        except Exception as e:
+            logger.error(f"Failed to delete from Chroma: {e}")
+            raise
 
     def as_retriever(self, **kwargs: Any):
         """Return a retriever interface."""

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
     minio_bucket_name: str = "documents"
+    minio_server_url: str = "http://localhost:80/minio"
 
     # Chroma DB settings
     chroma_db_host: str = "localhost"
@@ -33,6 +34,12 @@ class Settings(BaseSettings):
 
     # Admin API Key
     admin_api_key: str = "your-admin-api-key-here"
+
+    # RABBITMQ SETTINGS
+    rabbitmq_host: str = "rabbitmq"
+    rabbitmq_port: int = 5672
+    rabbitmq_user: str = "rabbitmq"
+    rabbitmq_pass: str = "rabbitmq"
 
     @field_validator("database_url", mode="before")
     def escape_percent(cls, v: str) -> str:

@@ -7,26 +7,35 @@ import asyncio
 from io import BytesIO
 from datetime import datetime, timedelta
 from typing import List, Dict
-from fastapi import HTTPException, UploadFile, BackgroundTasks
+from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session, selectinload
 from minio.error import MinioException
 
 from app.models.knowledge import (
     KnowledgeBase,
     Document,
+    DocumentChunk,
     DocumentUpload,
     ProcessingTask,
 )
-from app.services.minio_service import get_minio_client
+from app.services.minio_service import (
+    get_minio_client,
+)
 from app.services.embedding_factory import EmbeddingsFactory
 from app.services.chromadb_service import ChromaVectorStore
 from app.services.document_processor import (
     preview_document,
-    process_document_background,
     PreviewResult,
 )
-from app.services.processing_task_service import ProcessingTaskService
+from app.services.processing_task_service import (
+    ProcessingTaskService,
+    JobTypeEnum,
+)
 from app.core.config import settings
+from app.utils.mime_utils import get_file_info
+from app.tasks.document_task import process_document_task
+from app.tasks.doc_cleanup_task import cleanup_doc_task
+
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +58,6 @@ class DocumentService:
         self.kb_id = kb_id
         self.db = db
 
-    # -----------------------
-    # Upload
-    # -----------------------
     async def upload_documents(self, files: List[UploadFile]):
         kb = (
             self.db.query(KnowledgeBase)
@@ -161,6 +167,11 @@ class DocumentService:
                     status_code=500,
                     detail=f"Failed to upload file {clean_filename}: {str(e)}",
                 )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to upload file to MinIO: {str(e)}",
+                )
 
             upload = DocumentUpload(
                 knowledge_base_id=self.kb_id,
@@ -187,9 +198,6 @@ class DocumentService:
 
         return results
 
-    # -----------------------
-    # Preview
-    # -----------------------
     async def preview_documents(
         self, preview_request
     ) -> Dict[int, PreviewResult]:
@@ -229,11 +237,9 @@ class DocumentService:
 
         return results
 
-    # -----------------------
-    # Processing
-    # -----------------------
     async def process_documents(
-        self, upload_results: List[dict], background_tasks: BackgroundTasks
+        self,
+        upload_results: List[dict],
     ):
         kb = (
             self.db.query(KnowledgeBase)
@@ -265,21 +271,28 @@ class DocumentService:
         tasks = []
         for uid in upload_ids:
             if uid in uploads_dict:
-                task = task_service.create_task(self.kb_id, uid)
+                task = task_service.create_task(
+                    kb_id=self.kb_id,
+                    upload_id=uid,
+                    job_type=JobTypeEnum.process_doc,
+                )
                 tasks.append(task)
 
-        # enqueue background processing
-        task_data = [
-            {
-                "task_id": t.id,
-                "upload_id": t.document_upload_id,
-                "temp_path": uploads_dict[t.document_upload_id].temp_path,
-                "file_name": uploads_dict[t.document_upload_id].file_name,
-                "file_size": uploads_dict[t.document_upload_id].file_size,
-            }
-            for t in tasks
-        ]
-        background_tasks.add_task(self._enqueue_processing, task_data)
+        for task in tasks:
+            upload = uploads_dict[task.document_upload_id]
+            # celery tasks
+            celery_task = process_document_task.delay(
+                kb_id=self.kb_id,
+                task_id=task.id,
+                temp_path=upload.temp_path,
+                file_name=upload.file_name,
+                file_size=upload.file_size,
+            )
+            # update task with celery ID
+            task_service.update_status(
+                task_id=task.id,
+                celery_task_id=celery_task.id,
+            )
 
         return {
             "tasks": [
@@ -288,26 +301,6 @@ class DocumentService:
             ]
         }
 
-    async def _enqueue_processing(self, task_data: List[dict]):
-        await asyncio.sleep(0.3)
-        for data in task_data:
-            asyncio.create_task(
-                process_document_background(
-                    temp_path=data["temp_path"],
-                    file_name=data["file_name"],
-                    file_size=data["file_size"],
-                    kb_id=self.kb_id,
-                    task_id=data["task_id"],
-                    db=None,
-                )
-            )
-        logger.info(
-            f"Queued {len(task_data)} processing tasks for KB {self.kb_id}"
-        )
-
-    # -----------------------
-    # Cleanup
-    # -----------------------
     async def cleanup_temp_files(self):
         expired_time = datetime.utcnow() - timedelta(hours=24)
         expired_uploads = (
@@ -329,9 +322,6 @@ class DocumentService:
 
         return {"message": f"Cleaned {len(expired_uploads)} expired uploads"}
 
-    # -----------------------
-    # Tasks
-    # -----------------------
     async def get_processing_tasks(self, task_ids: str):
         ids = [int(i.strip()) for i in task_ids.split(",")]
         kb = (
@@ -367,9 +357,6 @@ class DocumentService:
             for t in tasks
         }
 
-    # -----------------------
-    # Get Document
-    # -----------------------
     async def get_document(self, doc_id: int):
         doc = (
             self.db.query(Document)
@@ -380,11 +367,10 @@ class DocumentService:
         )
         if not doc:
             raise HTTPException(status_code=404, detail="Document not found")
+        url = self._build_direct_url(doc.file_path)
+        setattr(doc, "file_url", url)
         return doc
 
-    # -----------------------
-    # Retrieval
-    # -----------------------
     def search(self, query: str, top_k: int = 5):
         embeddings = EmbeddingsFactory.create()
         vector_store = ChromaVectorStore(
@@ -405,9 +391,6 @@ class DocumentService:
             for doc, score in results
         ]
 
-    # -----------------------
-    # Get Documents Uploaded
-    # -----------------------
     def get_documents_upload(self):
         """Return all documents for the given Knowledge Base."""
         kb = self.db.query(KnowledgeBase).filter_by(id=self.kb_id).first()
@@ -437,3 +420,144 @@ class DocumentService:
             }
             for doc in docs
         ]
+
+    async def delete_document(self, document_id: int, user=None):
+        """
+        Delete a document from either `documents` or `document_uploads`,
+        delete DB records immediately,
+        and run MinIO + Chroma cleanup in Celery.
+        """
+        doc = (
+            self.db.query(Document)
+            .filter(
+                Document.id == document_id,
+                Document.knowledge_base_id == self.kb_id,
+            )
+            .first()
+        )
+
+        upload = None
+
+        if not doc:
+            upload = (
+                self.db.query(DocumentUpload)
+                .filter(
+                    DocumentUpload.id == document_id,
+                    DocumentUpload.knowledge_base_id == self.kb_id,
+                )
+                .first()
+            )
+            if not upload:
+                raise HTTPException(
+                    status_code=404, detail="Document not found"
+                )
+
+        if doc and doc.file_hash:
+            upload = (
+                self.db.query(DocumentUpload)
+                .filter(
+                    DocumentUpload.file_hash == doc.file_hash,
+                    DocumentUpload.knowledge_base_id == self.kb_id,
+                )
+                .first()
+            )
+
+        # ---- Prepare cleanup payload BEFORE deleting DB rows ----
+        # create task record
+        task_service = ProcessingTaskService(self.db)
+        task = task_service.create_task(
+            kb_id=self.kb_id,
+            document_id=doc.id if doc else None,
+            upload_id=upload.id if upload else None,
+            job_type=JobTypeEnum.delete_doc,
+        )
+
+        cleanup_payload = {
+            "task_id": task.id,
+            "kb_id": self.kb_id,
+            "document_id": document_id,
+            "file_path": doc.file_path if doc else upload.temp_path,
+            "is_processed": (
+                True if doc else False
+            ),  # processed = has chunks + Chroma
+        }
+
+        try:
+            if doc:
+                self.db.query(DocumentChunk).filter_by(
+                    document_id=doc.id
+                ).delete()
+                self.db.delete(doc)
+
+            if upload:
+                self.db.delete(upload)
+
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(500, f"DB cleanup failed: {e}")
+
+        # ---- PUSH CLEANUP TO CELERY ----
+        # enqueue celery task
+        celery_task = cleanup_doc_task.delay(payload=cleanup_payload)
+        task_service.update_status(
+            task_id=task.id, celery_task_id=celery_task.id
+        )
+
+        # ---- Return response (same structure as before) ----
+        return {
+            "success": True,
+            "message": "Document deleted successfully.",
+            "document_id": document_id,
+            "deleted_from": "documents" if doc else "document_uploads",
+            "celery_task_id": celery_task.id,
+        }
+
+    def _build_direct_url(self, file_path: str) -> str:
+        # Create direct URL through Nginx proxy
+        # (no signature needed with public bucket)
+        # Format: http://localhost:8080/minio/BUCKET/OBJECT_PATH
+        base = f"{settings.minio_server_url}/{settings.minio_bucket_name}"
+        url = f"{base}/{file_path}"
+        logger.info(f"Generated direct URL: {url}")
+        return url
+
+    async def get_presigned_file_info(self, doc_id: int):
+        doc = (
+            self.db.query(Document)
+            .filter(
+                Document.id == doc_id,
+                Document.knowledge_base_id == self.kb_id,
+            )
+            .first()
+        )
+        upload = None
+        if not doc:
+            upload = (
+                self.db.query(DocumentUpload)
+                .filter(
+                    DocumentUpload.id == doc_id,
+                    DocumentUpload.knowledge_base_id == self.kb_id,
+                )
+                .first()
+            )
+            if not upload:
+                raise HTTPException(
+                    status_code=404, detail="Document not found"
+                )
+
+        file_name = doc.file_name if doc else upload.file_name
+        file_path = doc.file_path if doc else upload.temp_path
+        url = self._build_direct_url(file_path)
+        file_info = get_file_info(file_name)
+
+        return {
+            "document_id": doc_id,
+            "file_name": file_name,
+            "file_path": file_path,
+            "file_type": file_info["mime_type"],
+            "file_extension": file_info["file_extension"],
+            "file_url": url,
+            "is_viewable_in_browser": file_info["is_viewable_in_browser"],
+            "source": "documents" if doc else "document_uploads",
+        }

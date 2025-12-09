@@ -1,4 +1,22 @@
 services:
+  # nginx:
+  #   build:
+  #     context: ./nginx
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "${NGINX_PORT:-8080}:80"
+  #   depends_on:
+  #     - main
+  #     - minio
+  #   networks:
+  #     - app_network
+  #   restart: unless-stopped
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
+
   db:
     image: postgres:17-alpine
     environment:
@@ -31,6 +49,43 @@ services:
     networks:
       - app_network
 
+  celery-worker:
+    build:
+      context: ./main
+      dockerfile: Dockerfile
+    entrypoint: ["/entrypoint-celery.sh"]
+    env_file:
+      - .env
+    environment:
+      - CELERY_MODE=worker
+    depends_on:
+      - rabbitmq
+      - main
+    volumes:
+      - ./main:/app
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  celery-beat:
+    build:
+      context: ./main
+      dockerfile: Dockerfile
+    entrypoint: ["/entrypoint-celery.sh"]
+    env_file:
+      - .env
+    environment:
+      - CELERY_MODE=beat
+    depends_on:
+      - rabbitmq
+      - main
+      - celery-worker
+    volumes:
+      - ./main:/app
+    networks:
+      - app_network
+    restart: unless-stopped
+
   chromadb:
     image: chromadb/chroma:1.1.0
     ports:
@@ -48,11 +103,55 @@ services:
     environment:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_SERVER_URL=${MINIO_SERVER_URL}
     volumes:
       - minio_data:/data
     command: server --console-address ":9001" /data
     networks:
       - app_network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-rabbitmq}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-rabbitmq}
+    ports:
+      - "5672:5672"
+      - "15672:15672"  # management console
+    networks:
+      - app_network
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  flower:
+    image: mher/flower
+    env_file:
+      - .env
+    command: >
+      celery
+        --broker=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@${RABBITMQ_HOST}:${RABBITMQ_PORT}//
+        --result-backend=rpc://
+        flower
+        --address=0.0.0.0
+        --port=${FLOWER_PORT:-5555}
+        --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-admin123}
+    ports:
+      - "${FLOWER_PORT:-5555}:5555"
+    depends_on:
+      - rabbitmq
+      - celery-worker
+    networks:
+      - app_network
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   script:
     build:

@@ -1,10 +1,11 @@
 import pytest
 
+from unittest.mock import patch
 from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from app.models.knowledge import KnowledgeBase, Document
+from app.models.knowledge import KnowledgeBase, Document, ProcessingTask
 
 
 @pytest.mark.asyncio
@@ -149,24 +150,34 @@ class TestDocumentViewAndDeleteRoutes:
         assert res.status_code == 404
         assert res.json()["detail"] == "Document not found"
 
+    @patch("app.services.document_service.cleanup_doc_task.delay")
     async def test_delete_document_unauthorized(
-        self, app: FastAPI, client: AsyncClient
+        self, mock_delay, app: FastAPI, client: AsyncClient, mock_celery
     ):
         """Should return 401 if no API key provided"""
+        # Return a real string as Celery task ID
+        mock_delay.return_value.id = "fake-celery-task-id-224"
+
         res = await client.delete(
             app.url_path_for("v1_delete_kb_document", kb_id=1, document_id=1)
         )
         assert res.status_code == 401
-        assert res.json()["detail"] == "API key required"
+        assert res.json() == {"detail": "API key required"}
 
+    @patch("app.services.document_service.cleanup_doc_task.delay")
     async def test_delete_document_success(
         self,
+        mock_delay,
         app: FastAPI,
         session: Session,
         client: AsyncClient,
         api_key_value: str,
+        mock_celery,
     ):
         """Should delete the document and return success"""
+        # Return a real string as Celery task ID
+        mock_delay.return_value.id = "fake-celery-task-id-234"
+
         kb = KnowledgeBase(name="KB Del", description="desc")
         session.add(kb)
         session.commit()
@@ -197,13 +208,38 @@ class TestDocumentViewAndDeleteRoutes:
         q = session.query(Document).filter(Document.id == doc.id).first()
         assert q is None
 
+        #  Ensure a ProcessingTask record was created
+        task = (
+            session.query(ProcessingTask)
+            .filter(ProcessingTask.celery_task_id == "fake-celery-task-id-234")
+            .first()
+        )
+        assert task is not None
+        assert task.status == "pending"
+        assert task.celery_task_id == "fake-celery-task-id-234"
+        assert task.job_type == "delete_doc"
+
+    @patch("app.services.document_service.cleanup_doc_task.delay")
     async def test_delete_document_not_found(
-        self, app: FastAPI, client: AsyncClient, api_key_value: str
+        self,
+        mock_delay,
+        app: FastAPI,
+        session: Session,
+        client: AsyncClient,
+        api_key_value: str,
+        mock_celery,
     ):
         """Should return 404 when deleting missing document"""
+        # Return a real string as Celery task ID
+        mock_delay.return_value.id = "fake-celery-task-id-254"
+
+        kb = KnowledgeBase(name="KB Del 2", description="desc")
+        session.add(kb)
+        session.commit()
+
         res = await client.delete(
             app.url_path_for(
-                "v1_delete_kb_document", kb_id=1, document_id=999
+                "v1_delete_kb_document", kb_id=kb.id, document_id=999
             ),
             headers=self.get_headers(api_key_value),
         )

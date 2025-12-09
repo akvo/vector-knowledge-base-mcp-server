@@ -80,6 +80,22 @@ jobs:
           dockerfile-location: "main/Dockerfile"
           cluster-name: "test"
 
+      - name: Docker Build Celery Worker
+        uses: ./composite-actions/.github/actions/docker-build
+        with:
+          app-name: ${{ steps.env.outputs.app_name }}
+          service-name: "celery-worker"
+          dockerfile-location: "main/Dockerfile"
+          cluster-name: "test"
+
+      - name: Docker Build Celery Beat
+        uses: ./composite-actions/.github/actions/docker-build
+        with:
+          app-name: ${{ steps.env.outputs.app_name }}
+          service-name: "celery-beat"
+          dockerfile-location: "main/Dockerfile"
+          cluster-name: "test"
+
       - name: Docker Build Script
         uses: ./composite-actions/.github/actions/docker-build
         with:
@@ -101,6 +117,22 @@ jobs:
         with:
           app-name: ${{ steps.env.outputs.app_name }}
           service-name: "main"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
+          cluster-name: "test"
+
+      - name: Docker Push Celery Worker
+        uses: ./composite-actions/.github/actions/docker-push
+        with:
+          app-name: ${{ steps.env.outputs.app_name }}
+          service-name: "celery-worker"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
+          cluster-name: "test"
+
+      - name: Docker Push Celery Beat
+        uses: ./composite-actions/.github/actions/docker-push
+        with:
+          app-name: ${{ steps.env.outputs.app_name }}
+          service-name: "celery-beat"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
           cluster-name: "test"
 
@@ -178,6 +210,26 @@ jobs:
           app-name: ${{ steps.env.outputs.app_name }}
           deployment-name: "main-deployment"
           container-name: "main"
+          cluster-name: "test"
+          namespace-name: ${{ steps.env.outputs.namespace_name }}
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
+
+      - name: Rollout Celery Worker
+        uses: ./composite-actions/.github/actions/k8s-rollout
+        with:
+          app-name: ${{ steps.env.outputs.app_name }}
+          deployment-name: "celery-worker-deployment"
+          container-name: "celery-worker"
+          cluster-name: "test"
+          namespace-name: ${{ steps.env.outputs.namespace_name }}
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
+
+      - name: Rollout Celery Beat
+        uses: ./composite-actions/.github/actions/k8s-rollout
+        with:
+          app-name: ${{ steps.env.outputs.app_name }}
+          deployment-name: "celery-beat-deployment"
+          container-name: "celery-beat"
           cluster-name: "test"
           namespace-name: ${{ steps.env.outputs.namespace_name }}
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}

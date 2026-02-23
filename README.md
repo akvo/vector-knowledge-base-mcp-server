@@ -390,6 +390,7 @@ vector-knowledge-base-mcp-server/
 │   ├── tests/                     # Unit / integration tests
 │   ├── Dockerfile
 │   └── requirements.txt
+├── script/                        # Data pipeline and init scripts
 ├── nginx/                         # Nginx reverse proxy
 │   ├── conf.d/
 │   │   └── default.conf          # Nginx configuration

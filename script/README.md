@@ -9,6 +9,10 @@
   - [🔐 Environment Variables](#-environment-variables-1)
   - [🚀 Running the Script](#-running-the-script-1)
   - [📁 Directory Structure](#-directory-structure-1)
+- [🤖 Living Income Knowledge Base import script](#-living-income-knowledge-base-import-script)
+  - [🔐 Environment Variables](#-environment-variables-2)
+  - [🚀 Running the Script](#-running-the-script-2)
+  - [📁 Directory Structure](#-directory-structure-2)
 
 ---
 
@@ -101,3 +105,33 @@ You will be prompted to:
 ```
 
 ---
+
+# 🤖 Living Income Knowledge Base import script
+
+This script automates the ingestion of local Living Income PDF documents into the Vector Knowledge Base MCP Server.
+
+## 🔐 Environment Variables
+
+Before running the script, ensure `ADMIN_API_KEY` is set in your `.env` file or environment. You can also override the target API URL using `RAG_MAIN_URL`.
+
+``` bash
+export ADMIN_API_KEY="your-admin-api-key-here"
+export RAG_MAIN_URL="http://main:8000/api/v1/"
+```
+
+## 🚀 Running the Script
+
+To execute the script as a module inside the Docker container:
+
+```bash
+./dev.sh exec script python -m kb_init_living_income
+```
+
+Optional arguments:
+- `--dry-run`: List files without uploading.
+- `--chunk-size`: Number of files per upload batch (default: 10).
+
+## 📁 Directory Structure
+```bash
+./downloads/living_income/ – Folder containing the source PDF files.
+```

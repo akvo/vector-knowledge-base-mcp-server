@@ -21,7 +21,9 @@ Before starting:
 3. Create an `agent_docs/` directory for artifacts
 4. **Check for existing artifacts** in `agent_docs/`. Explain the distinction between **Living Documents** (updated to maintain current state) and **Chronological Records** (newly created to preserve history).
 
-5. Ask if the user wants to run all phases or start from a specific phase
+5. **Commit Style**: All commits must be prefixed with `[#issue]` (e.g., `[#34] feat: add new tool`).
+
+6. Ask if the user wants to run all phases or start from a specific phase
 
 
 ## Lifecycle Phases
@@ -120,7 +122,8 @@ For every phase, if a corresponding artifact already exists in `agent_docs/`, yo
 2. Pick approved stories from sprint plan
 3. For each story, run TDD cycle (Red → Green → Refactor)
 4. Delegate to stack-specific `/2-implement` workflow
-5. Mark stories as Implemented
+5. Commit changes using `/5-commit` workflow (prefix with `[#issue]`)
+6. Mark stories as Implemented
 **Artifacts Produced**:
 - Working code with tests
 - Updated story statuses

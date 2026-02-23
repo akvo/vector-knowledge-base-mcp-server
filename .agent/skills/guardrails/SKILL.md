@@ -27,5 +27,5 @@ Self-review protocol to be followed before notifying the user.
 
 ### Code Quality
 - [ ] Code is formatted and linted.
-- [ ] `./dc.sh tests` passes.
+- [ ] `./dev.sh exec main ./test.sh all` passes.
 - [ ] New functionality is documented in the code or a walkthrough.

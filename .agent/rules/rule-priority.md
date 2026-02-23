@@ -4,6 +4,7 @@ Wait for approval from the `bmad-architect` (Winston) before making significant 
 
 ## Universal Priority
 
+0. **Onboarding**: All new agents must read `onboarding.md` first.
 1. **Security Mandate**: Never compromise security for speed or convenience.
 2. **Implementation Plan**: Follow the approved implementation plan.
 3. **Docker-First**: All commands must run via `./dev.sh`.

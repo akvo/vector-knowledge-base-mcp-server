@@ -27,6 +27,9 @@
 ```bash
 ./dev.sh logs chromadb                          # View ChromaDB logs
 ./dev.sh logs minio                             # View Minio logs
+./dev.sh logs celery-worker                     # View Celery worker logs
+./dev.sh logs celery-beat                       # View Celery beat logs
+./dev.sh logs flower                            # View Flower (task monitor) logs
 ```
 
 ## Rules

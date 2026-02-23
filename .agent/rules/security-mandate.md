@@ -14,6 +14,6 @@
 - **Input Validation**: Use Pydantic models for all request bodies.
 - **LLM Safety**: Sanitize and validate LLM outputs before using them in sensitive operations.
 - **Environment Variables**: Store API keys (OpenAI, Anthropic, etc.) and database secrets in `.env`, never hardcode.
-- **Minio Access**: Use signed URLs for accessing objects in Minio.
+- **Minio Access**: Documents are served publicly via Nginx proxy using a public read bucket policy. For sensitive data, implement API-based streaming or Nginx auth.
 - **Chroma Auth**: Ensure Chroma server is not exposed publicly without authentication or network isolation.
 - **Dependency Vetting**: Regularly check `requirements.txt` for known vulnerabilities.

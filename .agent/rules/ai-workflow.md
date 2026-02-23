@@ -1,19 +1,19 @@
 # AI Workflow Rules
 
-Guidelines for implementing AI agents and workflows using LangGraph and LangChain.
+Guidelines for implementing AI agents and RAG workflows using LangChain.
 
-## LangGraph Orchestration
+## LangChain RAG Orchestration
 
-1. **State Management**: Clearly define the `State` object for every graph. State should be immutable where possible.
-2. **Node Responsibility**: Each node in the graph should have a single, well-defined responsibility.
-3. **Edge Conditions**: Use conditional edges for complex branching logic based on agent reasoning.
-4. **Persistence**: Use LangGraph checkpointers for persisting agent state across sessions.
+1. **Document Loading**: Support various formats (PDF, DOCX, TXT) using `pypdf` and `python-docx`.
+2. **Chunking Strategy**: Use consistent chunking (e.g., recursive character text splitter) via `document_processor`.
+3. **Embedding Persistence**: Ensure embeddings are stored in ChromaDB using `langchain-chroma`.
+4. **Vector Search**: Use semantic similarity search with appropriate `top_k` filtering.
 
 ## LangChain Integration
 
-1. **Prompt Templates**: Store prompts in separate files or as structured constants. Avoid inline string interpolation for prompts.
-2. **Tool Definition**: Use `@tool` decorator or Pydantic classes to define tools for agents.
-3. **LLM Configuration**: Modularize LLM initialization to easily switch between providers (OpenAI, Anthropic, Ollama).
+1. **Prompt Templates**: Store prompts in separate files or as structured constants in `app/services/`.
+2. **Tool Definition**: Use FastMCP `@mcp.tool` decorator for exposing tools to MCP clients.
+3. **Model Configuration**: Use `langchain-openai` for model interactions, configured via `.env`.
 
 ## Vector Database (Chroma)
 

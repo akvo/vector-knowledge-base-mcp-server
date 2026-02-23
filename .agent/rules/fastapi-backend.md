@@ -17,6 +17,7 @@ Follow these standards for all Python backend code in this stack.
 - `app/services/`: Business logic and external service integrations.
 - `app/mcp/`: MCP protocol server and tool definitions.
 - `app/utils/`: Shared utility functions.
+- `script/`: Data pipeline and initialization scripts.
 
 ## Testing
 

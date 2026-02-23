@@ -19,7 +19,16 @@
 ./dev.sh exec main bash                          # Open shell in main container
 ./dev.sh exec main uvicorn app.main:app --host 0.0.0.0 --reload # Run app manually (inside container)
 ./dev.sh exec main ./test.sh all                 # Run all tests
-./dev.sh exec main pip install <package>         # Install dependencies (persist to requirements.txt manually)
+./dev.sh exec main pip install <package>         # Install dependencies
+```
+
+## Data Pipeline & Scripts
+
+```bash
+./dev.sh exec script python -m kb_init_unep         # Run UNEP import
+./dev.sh exec script python -m kb_init_tdt          # Run TDT import
+./dev.sh exec script python -m kb_init_living_income # Run Living Income import
+```
 ```
 
 ## AI & Data Services
@@ -34,6 +43,6 @@
 
 ## Rules
 
-1. **Never run `python`, `pip`, or `pytest` directly** — always prefix with `./dev.sh exec main`.
+1. **Never run `python`, `pip`, or `pytest` directly** — always prefix with `./dev.sh exec main` or `./dev.sh exec script`.
 2. **Hot reload** is enabled for the `main` service via volume mounting in dev mode.
 3. **Environment variables** go in `.env` file.

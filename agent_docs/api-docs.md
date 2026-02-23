@@ -12,6 +12,11 @@ All API requests (except health checks) require an API Key passed in the `Author
 - Header: `Authorization: API-Key <your_api_key>`
 - Used for: Accessing Knowledge Base and Document endpoints.
 
+### Target API URL (Optional)
+- Environment Variable: `RAG_MAIN_URL`
+- Default: `http://main:8000/api/v1/`
+- Used for: Overriding the backend API endpoint for internal scripts.
+
 ---
 
 ## Knowledge Base (KB) Endpoints

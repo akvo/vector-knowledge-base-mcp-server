@@ -2,7 +2,7 @@ import os
 import requests
 from typing import Optional
 
-MAIN_URL = "http://main:8000/api/v1/"
+MAIN_URL = os.getenv("RAG_MAIN_URL", "http://main:8000/api/v1/")
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "changeme")
 ADMIN_TOKEN = f"Admin-Key {ADMIN_API_KEY}"
 

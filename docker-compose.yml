@@ -160,6 +160,7 @@ services:
       - main
     environment:
       - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - RAG_MAIN_URL=${RAG_MAIN_URL}
     volumes:
       - ./script:/app
     tty: true

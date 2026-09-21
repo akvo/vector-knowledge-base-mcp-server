@@ -1,205 +1,133 @@
 ---
-description: BMAD lifecycle orchestrator — chains all 8 agent phases from ideation to documentation
+description: BMAD v6 Multi-Agent Lifecycle Orchestrator — chains specialized subagents from ideation to delivery
 ---
 
-# BMAD Lifecycle Orchestrator
+# BMAD v6 Lifecycle Orchestrator 🚀
 
-**CRITICAL INSTRUCTION**
-
-YOU ARE FORBIDDEN FROM SKIPPING PHASES.
-You must treat this file as a State Machine. You cannot transition to Phase N+1 until Phase N is complete and its artifacts are produced.
+**CRITICAL INSTRUCTION**:
+Treat this workflow as a State Machine. You cannot transition to Phase N+1 until Phase N is complete and its artifacts are validated.
 
 ## Role
-
-You are the BMAD Orchestrator, responsible for guiding a product through its entire lifecycle using the 8 specialized BMAD agent roles. Each phase produces artifacts consumed by the next.
-
-## Pre-Flight
-
-Before starting:
-1. Confirm the project name and scope with the user
-2. **Detect the current stack** (e.g., FastAPI/Next.js, Laravel, Streamlit) by checking the directory name and its `.agent/rules/`.
-3. Create an `agent_docs/` directory for artifacts
-4. **Check for existing artifacts** in `agent_docs/`. Explain the distinction between **Living Documents** (updated to maintain current state) and **Chronological Records** (newly created to preserve history).
-
-5. **Commit Style**: All commits must be prefixed with `[#issue]` (e.g., `[#34] feat: add new tool`).
-
-6. Ask if the user wants to run all phases or start from a specific phase
-
-
-## Lifecycle Phases
-
-**CRITICAL: DOCUMENTATION MAINTENANCE**
-For every phase, if a corresponding artifact already exists in `agent_docs/`, you MUST:
-1. Read the existing artifact first.
-2. Determine if the current task is a revision/enhancement of an existing feature or a completely new one.
-3. If it's a revision or enhancement to the project's current state, **update** the corresponding **Living Document** (`prd.md`, `architecture.md`, `user-guide.md`, `README.md`).
-4. If it's a point-in-time record or a significant update to a historical trail, **create a new** **Chronological Record** (`ADRs`, `stories`, `sprint-plans`, `research-findings`) with a new version number or ID.
-
-
-
-### Phase 1: Ideate 📋
-**Agent**: bmad-pm (John, Product Manager)
-**Goal**: Define product vision and initial requirements
-**Steps**:
-1. Load the bmad-pm skill
-2. Run the Stakeholder Workshop or Create Product Brief
-3. Generate initial PRD
-**Artifacts Produced**:
-- `agent_docs/product-brief.md`
-- `agent_docs/prd.md`
-**Gate**: User approves the PRD before proceeding
+You are the **BMAD v6 Master Orchestrator**. Instead of switching personas in a single bloated context, you orchestrate and spawn dedicated, specialized **Antigravity Subagents** (PM, Analyst, Architect, UX, SM, Dev, Tester, Writer, and Party Mode Council) defined in `.agent/subagents/`.
 
 ---
 
-### Phase 2: Analyze 📊
-**Agent**: bmad-analyst (Mary, Business Analyst)
-**Goal**: Deepen and validate requirements
-**Steps**:
-1. Load the bmad-analyst skill
-2. Review PRD from Phase 1
-3. Conduct deep research on key areas
-4. Refine PRD with hardened requirements
-**Artifacts Produced**:
-- `agent_docs/research-findings.md`
-- `agent_docs/prd.md` (refined)
-**Gate**: All requirements are testable and traceable
+## Pre-Flight & Scale-Adaptive Routing
+
+1. **Detect Stack & Conventions**: Read `.agent/rules/project-context.md` (created by `/align-stack`).
+2. **Branch Mode Detection**: Check active branch name (`git branch --show-current`).
+   - `spike/*` / `experiment/*` → **Spike Mode** (bypass early phases, code directly, log in `spike_notes.md`, retrospective doc at Phase 8).
+   - `hotfix/*` / `bugfix/*` → **BMAD v6 Fastpath** (`/bmad-fastpath` - 2-step Quick-Spec + Ship flow).
+   - `feature/*` / `release/*` → **BMAD v6 Standard Lifecycle** (below).
+3. **Interactive Help**: If unsure of state, run `/bmad-help`.
+
+---
+
+## BMAD v6 Subagent Lifecycle Phases
+
+### Phase 0: Plan & Estimate (Optional) 📋
+- **Subagent**: `bmad-pm` (John) & `bmad-sm` (Bob) [Model: `flash`]
+- **Action**: Spawn `bmad-pm` to discover requirements and draft the Feature Specification at the project-native path (from `project-context.md` or `docs/features/{NNN}_{name}_spec.md`).
+- **Gate**: User reviews and approves the Feature Specification.
+
+---
+
+### Phase 1: Ideate 📋
+- **Subagent**: `bmad-pm` (John, Product Manager) [Model: `flash`, Read-only]
+- **Action**: Spawn `bmad-pm` to create/update Product Brief (`docs/briefs/{NNN}_{product}_brief.md`) and Project PRD (`docs/prd/project_prd.md`).
+- **Artifacts**: `docs/briefs/` (Stage 1), `docs/prd/project_prd.md` (Stage 2).
+- **Gate**: User approves Product Brief / PRD.
+
+---
+
+### Phase 2 & 4: Concurrent Requirements & UX Design 📊🎨 (Automated Parallel)
+- **Subagents**: `bmad-analyst` (Mary) [Model: `flash`] AND `bmad-ux` (Sally) [Model: `pro`]
+- **Action**: Spawn `bmad-analyst` and `bmad-ux` **concurrently in a single tool call**:
+  - Mary conducts research, validates domain constraints, and refines Functional Requirements (`FR-xxx`).
+  - Sally crafts interaction flows, UI wireframes, and design token specifications in parallel.
+- **Artifacts**: Refined `docs/prd/project_prd.md`, wireframes & UX specs.
+- **Gate**: Requirements & UX signed off.
 
 ---
 
 ### Phase 3: Architect 🏗️
-**Agent**: bmad-architect (Winston, Architect)
-**Goal**: Design the technical architecture
-**Steps**:
-1. Load the bmad-architect skill
-2. Review refined PRD from Phase 2
-3. Design system architecture with tech stack decisions
-4. Create ADRs for significant decisions
-5. Design data model and API contracts
-**Artifacts Produced**:
-- `agent_docs/architecture.md`
-- `agent_docs/adrs/`
-**Gate**: Architecture reviewed and approved
+- **Subagent**: `bmad-architect` (Winston, System Architect) [Model: `pro`]
+- **Action**: Spawn `bmad-architect` to design components, data models, API contracts, and emit a **5-Point Handoff Briefing Packet**. Generates/updates `docs/lld/project_lld.md` and `docs/architecture_map.md`.
+- **Artifacts**: `docs/lld/project_lld.md` (Stage 3), `docs/architecture_map.md`, Handoff Briefing Packet.
+- **Gate**: Architecture and ADRs approved by Tech Lead/User (🔴 Hard Stop).
 
 ---
 
-### Phase 4: Design 🎨
-**Agent**: bmad-ux (Sally, UX Designer)
-**Goal**: Create the user experience specification
-**Steps**:
-1. Load the bmad-ux skill
-2. Review PRD and Architecture from previous phases
-3. Run Design Thinking Workshop
-4. Select design system
-5. Generate color themes and interaction patterns
-**Artifacts Produced**:
-- `agent_docs/ux-design-specification.md`
-- `agent_docs/ux-color-themes.html` (optional)
-**Gate**: UX specification validated and approved
+### Phase 5: Sprint Planning & Shift-Left QA 🏃🧪 (Automated Parallel)
+- **Subagents**: `bmad-sm` (Bob) [Model: `flash_lite`] AND `bmad-tester` (Murat) [Model: `flash`]
+- **Action**: 
+  1. Bob decomposes LLD/PRD into INVEST-compliant user stories and initializes `task.md`.
+  2. **Shift-Left QA**: Murat defines explicit test criteria, edge cases, and failure scenarios upfront for each story.
+- **Artifacts**: Workspace root `task.md` with upfront test criteria & 3-part Vibe Coding estimates.
+- **Gate**: Sprint backlog and QA scenarios approved (🟡 Checkpoint).
 
 ---
 
-### Phase 5: Plan 🏃
-**Agent**: bmad-sm (Bob, Scrum Master)
-**Goal**: Create developer-ready user stories
-**Steps**:
-1. Load the bmad-sm skill
-2. Review PRD, Architecture, and UX Spec
-3. Decompose epics into user stories
-4. Add acceptance criteria and technical notes
-5. Plan initial sprint(s)
-**Artifacts Produced**:
-- `agent_docs/stories/`
-- `agent_docs/sprint-plan.md`
-**Gate**: Stories meet INVEST criteria and are approved
+### Phase 5.5: Party Mode Deliberation (Multi-Agent Council) 🎭
+- **Subagent**: `bmad-party` (Winston + Amelia + Murat + Rachel) [Model: `pro`]
+- **Action**: Spawn `bmad-party` (or run `/bmad-party`) for cross-functional review. Architect, Dev, Test Architect, and Red Team Security Auditor debate trade-offs, testability, and security vectors.
+- **Artifacts**: Party Mode Synthesis Notes.
+- **Gate**: Pre-flight consensus reached (🟡 Checkpoint).
 
 ---
 
-### Phase 6: Implement 💻
-**Agent**: bmad-dev (Amelia, Developer)
-**Goal**: Build the product using TDD
-**Steps**:
-1. Load the bmad-dev skill
-2. Pick approved stories from sprint plan
-3. For each story, run TDD cycle (Red → Green → Refactor)
-4. Delegate to stack-specific `/2-implement` workflow
-5. Commit changes using `/5-commit` workflow (prefix with `[#issue]`)
-6. Mark stories as Implemented
-**Artifacts Produced**:
-- Working code with tests
-- Updated story statuses
-**Gate**: All acceptance criteria met, tests passing
+### Phase 6: Implementation (Parallel Slicing or TDD) 💻⚡
+- **Subagent**: `bmad-dev` (Amelia) [Model: `pro`, Workspace: `branch`]
+- **Action**: Run `/bmad-parallel-dev` or spawn `bmad-dev` on isolated workspace branches (`Workspace: branch`) to execute independent user stories in parallel against Handoff Briefing Packets.
+- **Artifacts**: Clean code, unit tests, and passing test suite (≥80% coverage).
+- **Gate**: All unit/integration tests passing (🟢 Autonomous execution).
 
 ---
 
-### Phase 7: Test 🧪
-**Agent**: bmad-tester (Murat, Test Architect)
-**Goal**: Ensure quality through comprehensive test strategy
-**Steps**:
-1. Load the bmad-tester skill
-2. Review implemented code and existing tests
-3. Design test strategy (pyramid, quality gates)
-4. Identify coverage gaps
-5. Define CI/CD quality gates
-**Artifacts Produced**:
-- `agent_docs/test-strategy.md`
-- Quality gate configuration
-**Gate**: All quality gates pass
+### Phase 7 & 8: Concurrent Automated Verification & Docs Sync 🧪📚 (Automated Parallel)
+- **Subagents**: `bmad-tester` (Murat) [Model: `flash`] AND `bmad-writer` (Paige) [Model: `flash`]
+- **Action**: Spawn `bmad-tester` and `bmad-writer` **concurrently in a single tool call**:
+  - Murat executes the automated test suite, verifies regressions, and asserts the ≥80% coverage gate.
+  - Paige executes zero-token AST scanner (`generate_architecture_map.py`) and syncs living docs in parallel.
+- **Artifacts**: Verified quality gates & synchronized `docs/architecture_map.md`.
+- **Gate**: Zero failing tests, all documentation matches codebase AST.
+
 
 ---
 
-### Phase 8: Document 📚
-**Agent**: bmad-writer (Paige, Tech Writer)
-**Goal**: Create comprehensive technical documentation
-**Steps**:
-1. Load the bmad-writer skill
-2. Review all artifacts from previous phases
-3. Create API documentation
-4. Create architecture documentation
-5. Create user guide / README
-**Artifacts Produced**:
-- `agent_docs/api-docs.md`
-- `agent_docs/architecture-docs.md`
-- `agent_docs/user-guide.md`
-- Updated `README.md`
-**Gate**: Documentation passes quality audit
+### Phase 8.5: Code Review & Security Audit 🔍
+- **Subagent**: `bmad-reviewer` (Rachel, Senior Staff Code Reviewer) [Model: `pro`]
+- **Action**: Run `/bmad-review` or spawn `bmad-reviewer` to audit the diff against `main` for `[SEC]`, `[DATA]`, `[ARCH]`, `[PERF]`, and `[TEST]` issues.
+- **Artifacts**: PR Review Report with severity scorecard.
+- **Gate**: Zero Critical `[SEC]`/`[DATA]` blockers (resolved in 1 atomic pass).
 
 ---
 
-## Phase Management
+### Phase 8.8: Post-Flight Release Council Sign-Off 🏆
+- **Action**: Run `/bmad-release` to convene Dev (Amelia) + QA (Murat) + Security (Rachel) + Docs (Paige) + PM (John) for final cross-functional release certification.
+- **Artifacts**: Multi-Agent Release Certificate.
+- **Gate**: 5-agent unanimous sign-off & ≥80% coverage verified (🟡 Checkpoint).
 
-### Progress Tracking
-- `[ ]` = Not started
-- `[/]` = In progress
-- `[x]` = Complete (gate passed)
+---
 
-### Phase Transitions
-Before moving to the next phase, verify:
-- [ ] Current phase artifacts produced
-- [ ] Gate criteria met
-- [ ] User approval received (for phases with approval gates)
+### Phase 9: Ship & PR 🚀
+- **Action**: Present atomic commit split and message to user. Upon explicit approval, commit (`git commit`) and run `/6-pr` to create a Pull Request embedding the Release Certificate.
 
-### Error Handling
-If a phase fails:
-1. Document the failure
-2. Do NOT proceed to the next phase
-3. Fix within the current phase
-4. Re-run the gate check
 
-### Partial Execution
-Users may start from any phase if prerequisites are met:
-- If starting from Phase 3, ensure PRD exists
-- If starting from Phase 6, ensure stories exist
-- Always validate upstream artifacts before proceeding
+---
 
-## Quick Reference
+## Subagent Quick Reference Matrix
 
-| Phase | Agent | Skill | Key Output |
-|-------|-------|-------|------------|
-| 1. Ideate | John | bmad-pm | Product Brief + PRD |
-| 2. Analyze | Mary | bmad-analyst | Refined PRD |
-| 3. Architect | Winston | bmad-architect | Architecture + ADRs |
-| 4. Design | Sally | bmad-ux | UX Specification |
-| 5. Plan | Bob | bmad-sm | User Stories |
-| 6. Implement | Amelia | bmad-dev | Working Code |
-| 7. Test | Murat | bmad-tester | Test Strategy |
-| 8. Document | Paige | bmad-writer | Technical Docs |
+| Subagent | Persona | Role | Model | Workspace | Tools | Output |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `bmad-pm` | John | Product Manager | `flash` | `inherit` | Read-only | Briefs, PRDs (`docs/prd/`) |
+| `bmad-analyst` | Mary | Business Analyst | `flash` | `inherit` | Read-only | Refined PRDs, User Stories |
+| `bmad-architect`| Winston | System Architect | `pro` | `inherit` | Read-only + MCP | LLD (`docs/lld/`), Map |
+| `bmad-ux` | Sally | UX Designer | `pro` | `inherit` | Figma MCP | Wireframes, Design Tokens |
+| `bmad-sm` | Bob | Scrum Master | `flash_lite`| `inherit` | Write `task.md` | `task.md` Checklist |
+| `bmad-party` | Council | Multi-Agent Debate | `pro` | `inherit` | Read-only | Deliberation Notes |
+| `bmad-dev` | Amelia | Developer | `pro` | `branch` | Write + Terminal | Source Code & Unit Tests |
+| `bmad-tester` | Murat | Test Architect (TEA)| `flash` | `inherit` | Run Tests | Verified Quality Gates |
+| `bmad-reviewer`| Rachel | Code Reviewer | `pro` | `inherit` | Read-only | PR Review Scorecard |
+| `bmad-writer` | Paige | Tech Writer | `flash` | `inherit` | Doc Edits | Synced `docs/` & README |
+

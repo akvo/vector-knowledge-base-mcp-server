@@ -1,17 +1,12 @@
-# Rule Priority
+## Rule Priority (Global)
 
-Wait for approval from the `bmad-architect` (Winston) before making significant changes to this rule.
+When two rules pull in opposite directions, use this priority to decide:
 
-## Universal Priority
-
-0. **Onboarding**: All new agents must read `onboarding.md` first.
-1. **Security Mandate**: Never compromise security for speed or convenience.
-2. **Implementation Plan**: Follow the approved implementation plan.
-3. **Docker-First**: All commands must run via `./dev.sh`.
-4. **Agent Personas**: Respect the BMAD agent roles and their expertise.
-
-## Conflict Resolution
-
-- If a framework-specific rule conflicts with a universal rule, the universal rule wins.
-- If two framework rules conflict, prioritize the one that enhances security or reliability.
-- When in doubt, call the `bmad-architect` for a decision.
+0. **Professional Team SOP** — The foundation of our collaboration (TDD, DRY, LLD).
+1. **Security** — Never compromise security for convenience.
+1.1 **Docs-First & Research** — Always reference official docs and best practices before acting.
+1.2 **Project Specifications & Contracts** — Always respect and follow all specifications, schemas, api contracts, and product briefs/designs defined under the `docs/` folder (such as `docs/product_brief.md`, `docs/api_contract.md`, PRDs under `docs/prd/`, and LLDs under `docs/lld/`) as the primary sources of truth if available.
+2. **Consistency** — Follow existing patterns in each stack directory while applying DRY.
+3. **Premium Quality** — Prioritize high-performance logic and premium aesthetics (Antigravity standard).
+4. **Stack Conventions** — Respect the target framework's idioms.
+5. **Simplicity** — When equally valid, prefer the simpler, more maintainable approach.

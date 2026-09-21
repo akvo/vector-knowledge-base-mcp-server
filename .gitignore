@@ -304,3 +304,7 @@ embeddings/
 # Cache directories
 .cache/
 cache/
+
+.agent/
+agent_docs/
+task.md

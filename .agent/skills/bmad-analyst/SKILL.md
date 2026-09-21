@@ -23,7 +23,7 @@ Conduct thorough research on a topic:
 4. Present actionable recommendations with evidence
 5. Identify gaps and areas needing further investigation
 
-**Output**: `agent_docs/research-findings.md`
+**Output**: Add inline to the Feature Spec (`docs/features/{feature_name}_spec.md`) under a "Technical Audit" or "Research Notes" section.
 
 ### 2. Requirements Elicitation
 
@@ -69,11 +69,18 @@ Compare current state vs. desired state:
 4. Present findings with evidence and data points
 5. Flag assumptions explicitly and request validation
 6. Detect the current stack by checking the directory name and its `.agent/rules/`. Respect stack-specific constraints (e.g., Docker commands, specific frameworks).
-7. Check `agent_docs/` for existing artifacts.
-    - **Living Documents** (`prd.md`): Always **update** these to reflect hardened requirements.
-    - **Chronological Records** (`research-findings.md`): Always **create new** versioned files (e.g., `research-findings-v2.md`) to preserve the history of research.
+7. Check `docs/` for existing artifacts.
+    - **PRDs** (`docs/prd/project_prd.md`): Always **update** these to reflect hardened requirements. Read them first.
+    - **Stage Progression**: Ensure the Project PRD exists and matches the Product Brief before performing deep elicitation.
+    - **Chronological Records**: Put research notes inside Feature Specifications or `task.md`.
 
-8. Produce structured, traceable documentation
+8. Produce structured, traceable documentation.
+9. **Issue Numbering**: Do NOT strictly require an issue number during ideation and research phases. Use slugs if an issue number is not available.
+10. **Proactive Workflows**: Proactively scan `.agent/workflows/` and use required workflows for the current stack.
+11. **Document Sharding**: Do not read entire codebases or massive documents at once. Use targeted searches (e.g., `grep`, `view_file` with specific lines) to shard the context. Ingest only the specific functions, classes, or document sections necessary for the current step.
+12. **Token Optimization**: Actively minimize token usage by performing targeted range-based file reads, utilizing fastpath for minor changes, and keeping outputs concise. Refer to @token-conservation.md.
+13. **Documentation Hierarchy**: Enforce the mandatory progression: Product Brief (Stage 1) → PRD (Stage 2) → LLD (Stage 3). Stop and request preceding stages if missing. Refer to @documentation-hierarchy.md.
+    - *Exception*: If Spike Mode is active, bypass this check during coding; perform retrospective requirements analysis on the spike's code output to construct the PRD prior to merge.
 
 
 ## Handoff
@@ -84,3 +91,5 @@ When requirements are refined, hand off to:
 
 ## Related Rules
 - BMAD Team @bmad-team.md
+- Token Conservation @token-conservation.md
+- Documentation Hierarchy @documentation-hierarchy.md

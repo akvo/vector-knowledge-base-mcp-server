@@ -96,7 +96,8 @@ services:
       - app_network
 
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z
+    image: cgr.dev/chainguard/minio:latest
+    user: "0:0"
     ports:
       - 9000:9000 # API port
       - 9001:9001 # Console port
